@@ -1,0 +1,396 @@
+<!-- Balena Fleet Node Configuration -->
+<script type="text/javascript">
+    RED.nodes.registerType('balena-fleet', {
+        category: 'balena',
+        color: '#4CAF50',
+        defaults: {
+            name: {value: ""},
+            operation: {value: "list", required: true},
+            fleetName: {value: ""},
+            organization: {value: ""},
+            deviceType: {value: ""},
+            timeout: {value: 30000, validate: function(v) { return v > 0; }},
+            enableCaching: {value: true},
+            cacheDuration: {value: 600, validate: function(v) { return v > 0; }},
+            outputFormat: {value: "json"}
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-ship",
+        label: function() {
+            if (this.name) {
+                return this.name;
+            }
+            return "balena-fleet: " + this.operation;
+        },
+        labelStyle: function() {
+            return this.name ? "node_label_italic" : "";
+        },
+        oneditprepare: function() {
+            var node = this;
+
+            // Fleet operations
+            var fleetOperations = {
+                list: {
+                    name: "List Fleets",
+                    description: "List all fleets or filter by organization",
+                    requiredFields: [],
+                    optionalFields: ["organization"]
+                },
+                info: {
+                    name: "Fleet Info",
+                    description: "Get detailed information about a specific fleet",
+                    requiredFields: ["fleetName"],
+                    optionalFields: []
+                },
+                create: {
+                    name: "Create Fleet",
+                    description: "Create a new fleet with specified device type",
+                    requiredFields: ["fleetName", "deviceType"],
+                    optionalFields: ["organization"]
+                },
+                delete: {
+                    name: "Delete Fleet",
+                    description: "Delete an existing fleet",
+                    requiredFields: ["fleetName"],
+                    optionalFields: []
+                },
+                rename: {
+                    name: "Rename Fleet",
+                    description: "Rename an existing fleet",
+                    requiredFields: ["fleetName", "newName"],
+                    optionalFields: []
+                },
+                releases: {
+                    name: "List Releases",
+                    description: "List all releases for a fleet",
+                    requiredFields: ["fleetName"],
+                    optionalFields: []
+                },
+                pin_release: {
+                    name: "Pin Release",
+                    description: "Pin a specific release to a fleet",
+                    requiredFields: ["fleetName", "releaseId"],
+                    optionalFields: []
+                },
+                track_latest: {
+                    name: "Track Latest",
+                    description: "Set fleet to track latest release",
+                    requiredFields: ["fleetName"],
+                    optionalFields: []
+                },
+                config: {
+                    name: "Generate Config",
+                    description: "Generate configuration for fleet",
+                    requiredFields: ["fleetName"],
+                    optionalFields: ["output", "version", "deviceApiKey", "deviceType"]
+                },
+                restart: {
+                    name: "Restart Fleet",
+                    description: "Restart all devices in fleet",
+                    requiredFields: ["fleetName"],
+                    optionalFields: []
+                },
+                purge: {
+                    name: "Purge Fleet",
+                    description: "Purge data for all devices in fleet",
+                    requiredFields: ["fleetName"],
+                    optionalFields: []
+                },
+                devices: {
+                    name: "Fleet Devices",
+                    description: "List all devices in a fleet",
+                    requiredFields: ["fleetName"],
+                    optionalFields: []
+                },
+                tags: {
+                    name: "List Tags",
+                    description: "List tags for a fleet",
+                    requiredFields: ["fleetName"],
+                    optionalFields: []
+                },
+                set_tag: {
+                    name: "Set Tag",
+                    description: "Set a tag on a fleet",
+                    requiredFields: ["fleetName", "tagKey"],
+                    optionalFields: ["tagValue"]
+                },
+                remove_tag: {
+                    name: "Remove Tag",
+                    description: "Remove a tag from a fleet",
+                    requiredFields: ["fleetName", "tagKey"],
+                    optionalFields: []
+                }
+            };
+
+            // Device types for create operation
+            var deviceTypes = [
+                "raspberry-pi", "raspberry-pi2", "raspberry-pi3", "raspberry-pi4-64",
+                "raspberrypi3-64", "raspberrypi4-64", "intel-nuc", "generic-x86_64-ext",
+                "jetson-nano", "jetson-tx2", "beaglebone-black", "up-board"
+            ];
+
+            // Initialize operation dropdown
+            var operationSelect = $("#node-input-operation");
+            operationSelect.empty();
+            Object.keys(fleetOperations).forEach(function(op) {
+                var option = fleetOperations[op];
+                operationSelect.append('<option value="' + op + '">' + option.name + '</option>');
+            });
+
+            // Initialize device type dropdown
+            var deviceTypeSelect = $("#node-input-deviceType");
+            deviceTypeSelect.empty();
+            deviceTypeSelect.append('<option value="">Select device type...</option>');
+            deviceTypes.forEach(function(type) {
+                deviceTypeSelect.append('<option value="' + type + '">' + type + '</option>');
+            });
+
+            // Operation change handler
+            $("#node-input-operation").change(function() {
+                var operation = $(this).val();
+                var config = fleetOperations[operation];
+                
+                // Update description
+                $("#operation-description").text(config.description);
+                
+                // Show/hide fields based on operation
+                updateFieldVisibility(config);
+            });
+
+            function updateFieldVisibility(config) {
+                // Fleet name field
+                if (config.requiredFields.includes("fleetName")) {
+                    $("#fleet-name-row").show();
+                    $("#fleet-name-label").text("Fleet Name *");
+                    $("#node-input-fleetName").attr("required", true);
+                } else if (config.optionalFields.includes("fleetName")) {
+                    $("#fleet-name-row").show();
+                    $("#fleet-name-label").text("Fleet Name");
+                    $("#node-input-fleetName").attr("required", false);
+                } else {
+                    $("#fleet-name-row").hide();
+                    $("#node-input-fleetName").attr("required", false);
+                }
+
+                // Device type field
+                if (config.requiredFields.includes("deviceType")) {
+                    $("#device-type-row").show();
+                    $("#device-type-label").text("Device Type *");
+                    $("#node-input-deviceType").attr("required", true);
+                } else if (config.optionalFields.includes("deviceType")) {
+                    $("#device-type-row").show();
+                    $("#device-type-label").text("Device Type");
+                    $("#node-input-deviceType").attr("required", false);
+                } else {
+                    $("#device-type-row").hide();
+                    $("#node-input-deviceType").attr("required", false);
+                }
+
+                // Organization field
+                if (config.requiredFields.includes("organization") || config.optionalFields.includes("organization")) {
+                    $("#organization-row").show();
+                    if (config.requiredFields.includes("organization")) {
+                        $("#organization-label").text("Organization *");
+                        $("#node-input-organization").attr("required", true);
+                    } else {
+                        $("#organization-label").text("Organization");
+                        $("#node-input-organization").attr("required", false);
+                    }
+                } else {
+                    $("#organization-row").hide();
+                    $("#node-input-organization").attr("required", false);
+                }
+
+                // Show/hide operation-specific sections
+                $(".operation-specific").hide();
+                
+                if (["rename"].includes($("#node-input-operation").val())) {
+                    $("#rename-section").show();
+                }
+                
+                if (["pin_release"].includes($("#node-input-operation").val())) {
+                    $("#release-section").show();
+                }
+                
+                if (["config"].includes($("#node-input-operation").val())) {
+                    $("#config-section").show();
+                }
+                
+                if (["set_tag", "remove_tag"].includes($("#node-input-operation").val())) {
+                    $("#tag-section").show();
+                }
+            }
+
+            // Initialize with current operation
+            $("#node-input-operation").trigger('change');
+
+            // Cache duration visibility
+            $("#node-input-enableCaching").change(function() {
+                if ($(this).is(':checked')) {
+                    $("#cache-duration-row").show();
+                } else {
+                    $("#cache-duration-row").hide();
+                }
+            }).trigger('change');
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="balena-fleet">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Fleet node name">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-operation"><i class="fa fa-cogs"></i> Operation</label>
+        <select id="node-input-operation">
+            <option value="list">List Fleets</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <div id="operation-description" style="font-style: italic; color: #666; margin-top: 5px;">
+            List all fleets or filter by organization
+        </div>
+    </div>
+
+    <div class="form-row" id="fleet-name-row">
+        <label for="node-input-fleetName" id="fleet-name-label"><i class="fa fa-ship"></i> Fleet Name</label>
+        <input type="text" id="node-input-fleetName" placeholder="Fleet name">
+    </div>
+
+    <div class="form-row" id="device-type-row">
+        <label for="node-input-deviceType" id="device-type-label"><i class="fa fa-microchip"></i> Device Type</label>
+        <select id="node-input-deviceType">
+            <option value="">Select device type...</option>
+        </select>
+    </div>
+
+    <div class="form-row" id="organization-row">
+        <label for="node-input-organization" id="organization-label"><i class="fa fa-building"></i> Organization</label>
+        <input type="text" id="node-input-organization" placeholder="Organization name (optional)">
+    </div>
+
+    <!-- Operation-specific sections -->
+    <div id="rename-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-newName"><i class="fa fa-edit"></i> New Name</label>
+            <input type="text" id="node-input-newName" placeholder="New fleet name">
+        </div>
+    </div>
+
+    <div id="release-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-releaseId"><i class="fa fa-code-fork"></i> Release ID</label>
+            <input type="text" id="node-input-releaseId" placeholder="Release ID to pin">
+        </div>
+    </div>
+
+    <div id="config-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-configOutput"><i class="fa fa-file"></i> Config Output</label>
+            <input type="text" id="node-input-configOutput" placeholder="Output file path (optional)">
+        </div>
+        <div class="form-row">
+            <label for="node-input-configVersion"><i class="fa fa-tag"></i> OS Version</label>
+            <input type="text" id="node-input-configVersion" placeholder="OS version (optional)">
+        </div>
+    </div>
+
+    <div id="tag-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-tagKey"><i class="fa fa-key"></i> Tag Key</label>
+            <input type="text" id="node-input-tagKey" placeholder="Tag key/name">
+        </div>
+        <div class="form-row">
+            <label for="node-input-tagValue"><i class="fa fa-value"></i> Tag Value</label>
+            <input type="text" id="node-input-tagValue" placeholder="Tag value (for set operation)">
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="form-row">
+        <label for="node-input-outputFormat"><i class="fa fa-file-text"></i> Output Format</label>
+        <select id="node-input-outputFormat">
+            <option value="json">JSON</option>
+            <option value="text">Text</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-timeout"><i class="fa fa-clock-o"></i> Timeout (ms)</label>
+        <input type="number" id="node-input-timeout" placeholder="30000" min="1000">
+    </div>
+
+    <div class="form-row">
+        <input type="checkbox" id="node-input-enableCaching" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-enableCaching" style="width: 70%;"> Enable Caching</label>
+    </div>
+
+    <div class="form-row" id="cache-duration-row">
+        <label for="node-input-cacheDuration"><i class="fa fa-database"></i> Cache Duration (s)</label>
+        <input type="number" id="node-input-cacheDuration" placeholder="600" min="1">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="balena-fleet">
+    <p>A Node-RED node for managing Balena fleets through the Balena CLI.</p>
+
+    <h3>Operations</h3>
+    <ul>
+        <li><strong>List</strong> - List all fleets or filter by organization</li>
+        <li><strong>Info</strong> - Get detailed fleet information</li>
+        <li><strong>Create/Delete</strong> - Fleet lifecycle management</li>
+        <li><strong>Rename</strong> - Change fleet name</li>
+        <li><strong>Releases</strong> - List and manage releases</li>
+        <li><strong>Pin/Track</strong> - Control release deployment strategy</li>
+        <li><strong>Config</strong> - Generate fleet configuration</li>
+        <li><strong>Restart/Purge</strong> - Fleet-wide operations</li>
+        <li><strong>Devices</strong> - List devices in fleet</li>
+        <li><strong>Tags</strong> - Manage fleet tags</li>
+    </ul>
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>operation <span class="property-type">string</span></dt>
+        <dd>Override the configured operation</dd>
+        
+        <dt>fleetName <span class="property-type">string</span></dt>
+        <dd>Override the configured fleet name</dd>
+        
+        <dt>deviceType <span class="property-type">string</span></dt>
+        <dd>Device type for create operation</dd>
+        
+        <dt>organization <span class="property-type">string</span></dt>
+        <dd>Organization for filtering or fleet creation</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object|array</span></dt>
+        <dd>The operation result, format depends on operation and output format setting</dd>
+        
+        <dt>operation <span class="property-type">string</span></dt>
+        <dd>The operation that was executed</dd>
+        
+        <dt>cached <span class="property-type">boolean</span></dt>
+        <dd>Whether the result was retrieved from cache</dd>
+    </dl>
+
+    <h3>Details</h3>
+    <p>This node provides comprehensive fleet management capabilities for Balena IoT fleets. 
+    It supports all major fleet operations including creation, configuration, release management, and device control.</p>
+    
+    <p>Caching is enabled by default for read operations to improve performance. 
+    Write operations always execute fresh to ensure consistency.</p>
+
+    <h3>Prerequisites</h3>
+    <ul>
+        <li>Balena CLI installed and in PATH</li>
+        <li>Valid Balena authentication (balena login)</li>
+        <li>Appropriate permissions for the target fleets</li>
+    </ul>
+</script> 

@@ -1,0 +1,59 @@
+{
+  "name": "node-red-contrib-balena-cli",
+  "version": "1.0.0",
+  "description": "A comprehensive Node-RED wrapper for Balena CLI providing device management, fleet operations, SSH access, and variable management for IoT deployments",
+  "main": "balena-cli.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MadnessEngineering/node-red-contrib-balena-cli.git"
+  },
+  "keywords": [
+    "node-red",
+    "balena",
+    "iot",
+    "device-management",
+    "fleet-management",
+    "ssh",
+    "cli",
+    "container",
+    "deployment",
+    "edge-computing",
+    "docker",
+    "embedded",
+    "remote-access",
+    "variables",
+    "configuration",
+    "madness",
+    "interactive"
+  ],
+  "author": "D. Edens <d.edens@todomill.dev>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/MadnessEngineering/node-red-contrib-balena-cli/issues"
+  },
+  "homepage": "https://github.com/MadnessEngineering/node-red-contrib-balena-cli#readme",
+  "node-red": {
+    "nodes": {
+      "balena-device": "balena-device.js",
+      "balena-fleet": "balena-fleet.js",
+      "balena-ssh": "balena-ssh.js",
+      "balena-variables": "balena-variables.js",
+      "balena-deploy": "balena-deploy.js"
+    }
+  },
+  "dependencies": {
+    "child_process": "^1.0.2",
+    "node-cache": "^5.1.2",
+    "axios": "^1.6.0",
+    "ssh2": "^1.14.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "peerDependencies": {
+    "balena-cli": ">=17.0.0"
+  }
+} 

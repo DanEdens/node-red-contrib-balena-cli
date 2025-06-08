@@ -1,0 +1,347 @@
+<!-- Balena Variables Node Configuration -->
+<script type="text/javascript">
+    RED.nodes.registerType('balena-variables', {
+        category: 'balena',
+        color: '#9C27B0',
+        defaults: {
+            name: {value: ""},
+            operation: {value: "list", required: true},
+            scope: {value: "fleet", required: true},
+            target: {value: ""},
+            variableName: {value: ""},
+            variableValue: {value: ""},
+            timeout: {value: 30000, validate: function(v) { return v > 0; }},
+            enableCaching: {value: true},
+            cacheDuration: {value: 300, validate: function(v) { return v > 0; }},
+            outputFormat: {value: "json"}
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-cog",
+        label: function() {
+            if (this.name) {
+                return this.name;
+            }
+            return "balena-vars: " + this.operation + " (" + this.scope + ")";
+        },
+        labelStyle: function() {
+            return this.name ? "node_label_italic" : "";
+        },
+        oneditprepare: function() {
+            var node = this;
+
+            // Variable operations
+            var variableOperations = {
+                list: {
+                    name: "List Variables",
+                    description: "List all environment variables for the target",
+                    requiredFields: ["target"],
+                    optionalFields: []
+                },
+                get: {
+                    name: "Get Variable",
+                    description: "Get value of a specific environment variable",
+                    requiredFields: ["target", "variableName"],
+                    optionalFields: []
+                },
+                set: {
+                    name: "Set Variable",
+                    description: "Set value of an environment variable",
+                    requiredFields: ["target", "variableName"],
+                    optionalFields: ["variableValue"]
+                },
+                remove: {
+                    name: "Remove Variable",
+                    description: "Remove an environment variable",
+                    requiredFields: ["target", "variableName"],
+                    optionalFields: []
+                },
+                rename: {
+                    name: "Rename Variable",
+                    description: "Rename an environment variable",
+                    requiredFields: ["target", "variableName", "newName"],
+                    optionalFields: []
+                },
+                config_vars: {
+                    name: "List Config Variables",
+                    description: "List configuration variables for the target",
+                    requiredFields: ["target"],
+                    optionalFields: []
+                },
+                set_config_var: {
+                    name: "Set Config Variable",
+                    description: "Set a configuration variable",
+                    requiredFields: ["target", "variableName"],
+                    optionalFields: ["variableValue"]
+                },
+                batch_set: {
+                    name: "Batch Set Variables",
+                    description: "Set multiple variables at once",
+                    requiredFields: ["target"],
+                    optionalFields: ["variables"]
+                },
+                bulk_remove: {
+                    name: "Bulk Remove Variables",
+                    description: "Remove multiple variables at once",
+                    requiredFields: ["target"],
+                    optionalFields: ["variableNames"]
+                }
+            };
+
+            // Initialize operation dropdown
+            var operationSelect = $("#node-input-operation");
+            operationSelect.empty();
+            Object.keys(variableOperations).forEach(function(op) {
+                var option = variableOperations[op];
+                operationSelect.append('<option value="' + op + '">' + option.name + '</option>');
+            });
+
+            // Operation change handler
+            $("#node-input-operation").change(function() {
+                var operation = $(this).val();
+                var config = variableOperations[operation];
+                
+                // Update description
+                $("#operation-description").text(config.description);
+                
+                // Show/hide fields based on operation
+                updateFieldVisibility(config);
+            });
+
+            // Scope change handler
+            $("#node-input-scope").change(function() {
+                var scope = $(this).val();
+                var targetLabel = scope === "fleet" ? "Fleet Name" : "Device UUID";
+                var targetPlaceholder = scope === "fleet" ? "Fleet name" : "Device UUID";
+                
+                $("#target-label").text(targetLabel + " *");
+                $("#node-input-target").attr("placeholder", targetPlaceholder);
+            });
+
+            function updateFieldVisibility(config) {
+                // Target field (always required)
+                $("#target-row").show();
+                $("#node-input-target").attr("required", true);
+
+                // Variable name field
+                if (config.requiredFields.includes("variableName")) {
+                    $("#variable-name-row").show();
+                    $("#variable-name-label").text("Variable Name *");
+                    $("#node-input-variableName").attr("required", true);
+                } else {
+                    $("#variable-name-row").hide();
+                    $("#node-input-variableName").attr("required", false);
+                }
+
+                // Variable value field
+                if (config.requiredFields.includes("variableValue") || config.optionalFields.includes("variableValue")) {
+                    $("#variable-value-row").show();
+                    if (config.requiredFields.includes("variableValue")) {
+                        $("#variable-value-label").text("Variable Value *");
+                        $("#node-input-variableValue").attr("required", true);
+                    } else {
+                        $("#variable-value-label").text("Variable Value");
+                        $("#node-input-variableValue").attr("required", false);
+                    }
+                } else {
+                    $("#variable-value-row").hide();
+                    $("#node-input-variableValue").attr("required", false);
+                }
+
+                // Show/hide operation-specific sections
+                $(".operation-specific").hide();
+                
+                if (["rename"].includes($("#node-input-operation").val())) {
+                    $("#rename-section").show();
+                }
+                
+                if (["batch_set"].includes($("#node-input-operation").val())) {
+                    $("#batch-section").show();
+                }
+                
+                if (["bulk_remove"].includes($("#node-input-operation").val())) {
+                    $("#bulk-remove-section").show();
+                }
+            }
+
+            // Initialize with current operation
+            $("#node-input-operation").trigger('change');
+            $("#node-input-scope").trigger('change');
+
+            // Cache duration visibility
+            $("#node-input-enableCaching").change(function() {
+                if ($(this).is(':checked')) {
+                    $("#cache-duration-row").show();
+                } else {
+                    $("#cache-duration-row").hide();
+                }
+            }).trigger('change');
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="balena-variables">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Variables node name">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-operation"><i class="fa fa-cogs"></i> Operation</label>
+        <select id="node-input-operation">
+            <option value="list">List Variables</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <div id="operation-description" style="font-style: italic; color: #666; margin-top: 5px;">
+            List all environment variables for the target
+        </div>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-scope"><i class="fa fa-crosshairs"></i> Scope</label>
+        <select id="node-input-scope">
+            <option value="fleet">Fleet</option>
+            <option value="device">Device</option>
+        </select>
+    </div>
+
+    <div class="form-row" id="target-row">
+        <label for="node-input-target" id="target-label"><i class="fa fa-bullseye"></i> Fleet Name *</label>
+        <input type="text" id="node-input-target" placeholder="Fleet name">
+    </div>
+
+    <div class="form-row" id="variable-name-row">
+        <label for="node-input-variableName" id="variable-name-label"><i class="fa fa-key"></i> Variable Name</label>
+        <input type="text" id="node-input-variableName" placeholder="Environment variable name">
+    </div>
+
+    <div class="form-row" id="variable-value-row">
+        <label for="node-input-variableValue" id="variable-value-label"><i class="fa fa-value"></i> Variable Value</label>
+        <input type="text" id="node-input-variableValue" placeholder="Environment variable value">
+    </div>
+
+    <!-- Operation-specific sections -->
+    <div id="rename-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-newName"><i class="fa fa-edit"></i> New Name</label>
+            <input type="text" id="node-input-newName" placeholder="New variable name">
+        </div>
+    </div>
+
+    <div id="batch-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-batchVariables"><i class="fa fa-list"></i> Variables (JSON)</label>
+            <textarea id="node-input-batchVariables" rows="4" placeholder='{"VAR1": "value1", "VAR2": "value2"}'></textarea>
+            <div style="font-style: italic; color: #666; margin-top: 5px;">
+                JSON object with variable names as keys and values as values
+            </div>
+        </div>
+    </div>
+
+    <div id="bulk-remove-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-removeList"><i class="fa fa-times"></i> Variables to Remove</label>
+            <textarea id="node-input-removeList" rows="3" placeholder='["VAR1", "VAR2", "VAR3"]'></textarea>
+            <div style="font-style: italic; color: #666; margin-top: 5px;">
+                JSON array of variable names to remove
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="form-row">
+        <label for="node-input-outputFormat"><i class="fa fa-file-text"></i> Output Format</label>
+        <select id="node-input-outputFormat">
+            <option value="json">JSON</option>
+            <option value="text">Text</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-timeout"><i class="fa fa-clock-o"></i> Timeout (ms)</label>
+        <input type="number" id="node-input-timeout" placeholder="30000" min="1000">
+    </div>
+
+    <div class="form-row">
+        <input type="checkbox" id="node-input-enableCaching" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-enableCaching" style="width: 70%;"> Enable Caching</label>
+    </div>
+
+    <div class="form-row" id="cache-duration-row">
+        <label for="node-input-cacheDuration"><i class="fa fa-database"></i> Cache Duration (s)</label>
+        <input type="number" id="node-input-cacheDuration" placeholder="300" min="1">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="balena-variables">
+    <p>A Node-RED node for managing environment variables on Balena fleets and devices.</p>
+
+    <h3>Operations</h3>
+    <ul>
+        <li><strong>List/Get</strong> - Retrieve variable values</li>
+        <li><strong>Set/Remove</strong> - Manage individual variables</li>
+        <li><strong>Rename</strong> - Change variable names</li>
+        <li><strong>Config Variables</strong> - Manage configuration variables</li>
+        <li><strong>Batch Operations</strong> - Set or remove multiple variables at once</li>
+    </ul>
+
+    <h3>Scope</h3>
+    <p>Variables can be managed at two levels:</p>
+    <ul>
+        <li><strong>Fleet</strong> - Variables applied to all devices in a fleet</li>
+        <li><strong>Device</strong> - Variables specific to individual devices</li>
+    </ul>
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>operation <span class="property-type">string</span></dt>
+        <dd>Override the configured operation</dd>
+        
+        <dt>scope <span class="property-type">string</span></dt>
+        <dd>Override the configured scope (fleet/device)</dd>
+        
+        <dt>target <span class="property-type">string</span></dt>
+        <dd>Fleet name or device UUID</dd>
+        
+        <dt>variableName <span class="property-type">string</span></dt>
+        <dd>Variable name for single operations</dd>
+        
+        <dt>variableValue <span class="property-type">string</span></dt>
+        <dd>Variable value for set operations</dd>
+        
+        <dt>variables <span class="property-type">object</span></dt>
+        <dd>Object with key-value pairs for batch set operation</dd>
+        
+        <dt>variableNames <span class="property-type">array</span></dt>
+        <dd>Array of variable names for bulk remove operation</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object|array</span></dt>
+        <dd>Variable data or operation results</dd>
+        
+        <dt>operation <span class="property-type">string</span></dt>
+        <dd>The operation that was executed</dd>
+        
+        <dt>cached <span class="property-type">boolean</span></dt>
+        <dd>Whether the result was retrieved from cache</dd>
+    </dl>
+
+    <h3>Details</h3>
+    <p>This node provides comprehensive environment variable management for Balena IoT deployments. 
+    Variables can be managed at both fleet and device levels, with support for batch operations.</p>
+    
+    <p>Environment variables are used to configure applications without code changes. 
+    Fleet variables are inherited by all devices, while device variables override fleet settings.</p>
+
+    <h3>Prerequisites</h3>
+    <ul>
+        <li>Balena CLI installed and authenticated</li>
+        <li>Appropriate permissions for the target fleet/device</li>
+        <li>Valid fleet name or device UUID</li>
+    </ul>
+</script> 

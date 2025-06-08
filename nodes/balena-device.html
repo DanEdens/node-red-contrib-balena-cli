@@ -1,0 +1,276 @@
+<!-- Balena Device Management Node Configuration -->
+<script type="text/javascript">
+    RED.nodes.registerType('balena-device', {
+        category: 'balena',
+        color: '#00AEEF',
+        defaults: {
+            name: {value: ""},
+            operation: {value: "list", required: true},
+            deviceUuid: {value: ""},
+            fleetName: {value: ""},
+            field: {value: "payload", required: true},
+            fieldType: {value: "msg"},
+            enableCaching: {value: true},
+            cacheDuration: {value: 300, validate: function(v) { return v > 0; }},
+            timeout: {value: 30000, validate: function(v) { return v > 0; }},
+            outputFormat: {value: "json"},
+            credentials: {value: "", type: "balena-credentials"}
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-microchip",
+        label: function() {
+            if (this.name) {
+                return this.name;
+            }
+            return "balena-device: " + this.operation;
+        },
+        labelStyle: function() {
+            return this.name ? "node_label_italic" : "";
+        },
+        oneditprepare: function() {
+            var node = this;
+
+            // Initialize field type selector
+            $("#node-input-fieldType").typedInput({
+                type: "msg",
+                types: ["msg", "flow", "global"],
+                typeField: "#node-input-fieldType"
+            });
+
+            // Device operations
+            var deviceOperations = {
+                list: "List all devices or filter by fleet",
+                info: "Get detailed information about a specific device",
+                enable_local_mode: "Enable local mode for development",
+                disable_local_mode: "Disable local mode",
+                restart: "Restart a device",
+                shutdown: "Shutdown a device",
+                logs: "Get device logs with optional filtering",
+                move: "Move device to a different fleet",
+                rename: "Rename a device"
+            };
+
+            // Update description when operation changes
+            $("#node-input-operation").change(function() {
+                var operation = $(this).val();
+                $("#operation-description").text(deviceOperations[operation] || "");
+                
+                // Show/hide relevant fields based on operation
+                updateFieldVisibility(operation);
+            });
+
+            function updateFieldVisibility(operation) {
+                // Hide all optional fields first
+                $("#device-uuid-row").hide();
+                $("#fleet-name-row").hide();
+                $("#new-name-row").hide();
+                $("#logs-options").hide();
+
+                // Show fields based on operation
+                switch(operation) {
+                    case "list":
+                        $("#fleet-name-row").show();
+                        break;
+                    case "info":
+                    case "enable_local_mode":
+                    case "disable_local_mode":
+                    case "restart":
+                    case "shutdown":
+                        $("#device-uuid-row").show();
+                        break;
+                    case "logs":
+                        $("#device-uuid-row").show();
+                        $("#logs-options").show();
+                        break;
+                    case "move":
+                        $("#device-uuid-row").show();
+                        $("#fleet-name-row").show();
+                        break;
+                    case "rename":
+                        $("#device-uuid-row").show();
+                        $("#new-name-row").show();
+                        break;
+                }
+            }
+
+            // Initialize visibility
+            updateFieldVisibility($("#node-input-operation").val());
+
+            // Set initial description
+            $("#operation-description").text(deviceOperations[$("#node-input-operation").val()] || "");
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="balena-device">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Device Management">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-credentials"><i class="fa fa-key"></i> Credentials</label>
+        <input type="text" id="node-input-credentials">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-operation"><i class="fa fa-cog"></i> Operation</label>
+        <select id="node-input-operation">
+            <option value="list">List Devices</option>
+            <option value="info">Device Info</option>
+            <option value="enable_local_mode">Enable Local Mode</option>
+            <option value="disable_local_mode">Disable Local Mode</option>
+            <option value="restart">Restart Device</option>
+            <option value="shutdown">Shutdown Device</option>
+            <option value="logs">Get Logs</option>
+            <option value="move">Move to Fleet</option>
+            <option value="rename">Rename Device</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label></label>
+        <div class="node-input-operation-description" id="operation-description" style="font-style: italic; color: #666;"></div>
+    </div>
+
+    <div class="form-row" id="device-uuid-row">
+        <label for="node-input-deviceUuid"><i class="fa fa-id-card"></i> Device UUID</label>
+        <input type="text" id="node-input-deviceUuid" placeholder="Leave empty to use msg.deviceUuid">
+    </div>
+
+    <div class="form-row" id="fleet-name-row">
+        <label for="node-input-fleetName"><i class="fa fa-ship"></i> Fleet Name</label>
+        <input type="text" id="node-input-fleetName" placeholder="Leave empty to use msg.fleetName">
+    </div>
+
+    <div class="form-row" id="new-name-row" style="display: none;">
+        <label for="node-input-newName"><i class="fa fa-edit"></i> New Name</label>
+        <input type="text" id="node-input-newName" placeholder="New device name">
+    </div>
+
+    <!-- Logs options section -->
+    <div id="logs-options" style="display: none;">
+        <hr>
+        <h4>Log Options</h4>
+        <div class="form-row">
+            <label for="node-input-tail"><i class="fa fa-list"></i> Tail Lines</label>
+            <input type="number" id="node-input-tail" placeholder="Number of recent lines" min="1">
+        </div>
+        <div class="form-row">
+            <label for="node-input-since"><i class="fa fa-clock-o"></i> Since</label>
+            <input type="text" id="node-input-since" placeholder="e.g., 1h, 30m, 2023-01-01">
+        </div>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-field"><i class="fa fa-edit"></i> Input Field</label>
+        <input type="text" id="node-input-field" style="width: 60%;">
+        <input type="hidden" id="node-input-fieldType">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-outputFormat"><i class="fa fa-file-code-o"></i> Output Format</label>
+        <select id="node-input-outputFormat">
+            <option value="json">JSON</option>
+            <option value="text">Text</option>
+        </select>
+    </div>
+
+    <hr>
+    <h4>Performance Options</h4>
+
+    <div class="form-row">
+        <label for="node-input-enableCaching"><i class="fa fa-database"></i> Enable Caching</label>
+        <input type="checkbox" id="node-input-enableCaching" style="width: auto;">
+        <span style="margin-left: 10px; font-style: italic; color: #666;">Cache read operations for better performance</span>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-cacheDuration"><i class="fa fa-clock-o"></i> Cache Duration</label>
+        <input type="number" id="node-input-cacheDuration" style="width: 100px;" min="1" max="3600"> seconds
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-timeout"><i class="fa fa-hourglass"></i> Timeout</label>
+        <input type="number" id="node-input-timeout" style="width: 100px;" min="1000" max="300000"> ms
+    </div>
+</script>
+
+<script type="text/html" data-help-name="balena-device">
+    <p>A comprehensive Balena device management node that provides device operations including information retrieval, power control, log access, and fleet management.</p>
+    
+    <h3>Operations</h3>
+    <dl class="message-properties">
+        <dt>list <span class="property-type">operation</span></dt>
+        <dd>List all devices or filter by fleet</dd>
+        
+        <dt>info <span class="property-type">operation</span></dt>
+        <dd>Get detailed information about a specific device</dd>
+        
+        <dt>enable_local_mode <span class="property-type">operation</span></dt>
+        <dd>Enable local mode for development access</dd>
+        
+        <dt>disable_local_mode <span class="property-type">operation</span></dt>
+        <dd>Disable local mode</dd>
+        
+        <dt>restart <span class="property-type">operation</span></dt>
+        <dd>Restart a device</dd>
+        
+        <dt>shutdown <span class="property-type">operation</span></dt>
+        <dd>Shutdown a device</dd>
+        
+        <dt>logs <span class="property-type">operation</span></dt>
+        <dd>Get device logs with optional filtering</dd>
+        
+        <dt>move <span class="property-type">operation</span></dt>
+        <dd>Move device to a different fleet</dd>
+        
+        <dt>rename <span class="property-type">operation</span></dt>
+        <dd>Rename a device</dd>
+    </dl>
+
+    <h3>Input</h3>
+    <p>The node accepts input through the configured field (default: <code>msg.payload</code>) or directly through message properties:</p>
+    <dl class="message-properties">
+        <dt>deviceUuid <span class="property-type">string</span></dt>
+        <dd>UUID of the target device</dd>
+        
+        <dt>fleetName <span class="property-type">string</span></dt>
+        <dd>Fleet name for filtering or moving devices</dd>
+        
+        <dt>operation <span class="property-type">string</span></dt>
+        <dd>Override the configured operation</dd>
+        
+        <dt>newName <span class="property-type">string</span></dt>
+        <dd>New name for rename operations</dd>
+        
+        <dt>tail <span class="property-type">number</span></dt>
+        <dd>Number of recent log lines to retrieve</dd>
+        
+        <dt>since <span class="property-type">string</span></dt>
+        <dd>Time filter for logs (e.g., "1h", "30m", "2023-01-01")</dd>
+    </dl>
+
+    <h3>Output</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object | string</span></dt>
+        <dd>The result of the device operation (JSON object or text string based on output format)</dd>
+        
+        <dt>operation <span class="property-type">string</span></dt>
+        <dd>The operation that was performed</dd>
+        
+        <dt>deviceUuid <span class="property-type">string</span></dt>
+        <dd>The device UUID that was operated on</dd>
+    </dl>
+
+    <h3>Configuration</h3>
+    <p><strong>Credentials:</strong> Select a Balena credentials configuration node for authentication.</p>
+    <p><strong>Caching:</strong> Read operations (list, info, logs) can be cached to improve performance. Cache duration is configurable.</p>
+    <p><strong>Timeout:</strong> Configurable timeout for CLI operations (default: 30 seconds).</p>
+    <p><strong>Output Format:</strong> Choose between JSON and text output formats.</p>
+
+    <h3>Requirements</h3>
+    <p>Requires Balena CLI to be installed and configured on the system. The node will execute <code>balena</code> commands using the system's CLI installation.</p>
+    <p>A Balena credentials configuration node must be configured and selected for authentication.</p>
+</script> 

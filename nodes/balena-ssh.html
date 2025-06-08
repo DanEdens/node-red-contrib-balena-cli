@@ -1,0 +1,274 @@
+<!-- Balena SSH Node Configuration -->
+<script type="text/javascript">
+    RED.nodes.registerType('balena-ssh', {
+        category: 'balena',
+        color: '#FFA500',
+        defaults: {
+            name: {value: ""},
+            operation: {value: "command", required: true},
+            deviceUuid: {value: ""},
+            command: {value: ""},
+            container: {value: ""},
+            timeout: {value: 30000, validate: function(v) { return v > 0; }},
+            sshPort: {value: 22222, validate: function(v) { return v > 0 && v <= 65535; }},
+            useBuiltInSsh: {value: true}
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-terminal",
+        label: function() {
+            if (this.name) {
+                return this.name;
+            }
+            return "balena-ssh: " + this.operation;
+        },
+        labelStyle: function() {
+            return this.name ? "node_label_italic" : "";
+        },
+        oneditprepare: function() {
+            var node = this;
+
+            // SSH operations
+            var sshOperations = {
+                command: {
+                    name: "Execute Command",
+                    description: "Execute a command on the device via SSH",
+                    requiredFields: ["deviceUuid", "command"],
+                    optionalFields: ["container"]
+                },
+                interactive: {
+                    name: "Interactive Session Info",
+                    description: "Get connection information for interactive SSH session",
+                    requiredFields: ["deviceUuid"],
+                    optionalFields: ["container"]
+                },
+                tunnel: {
+                    name: "SSH Tunnel",
+                    description: "Create an SSH tunnel to the device",
+                    requiredFields: ["deviceUuid"],
+                    optionalFields: ["localPort", "remotePort", "remoteHost"]
+                },
+                file_transfer: {
+                    name: "File Transfer",
+                    description: "Transfer files to/from device (placeholder)",
+                    requiredFields: ["deviceUuid", "source", "destination"],
+                    optionalFields: ["direction"]
+                },
+                host_os: {
+                    name: "Host OS Command",
+                    description: "Execute command on the host OS (not in container)",
+                    requiredFields: ["deviceUuid", "command"],
+                    optionalFields: []
+                }
+            };
+
+            // Initialize operation dropdown
+            var operationSelect = $("#node-input-operation");
+            operationSelect.empty();
+            Object.keys(sshOperations).forEach(function(op) {
+                var option = sshOperations[op];
+                operationSelect.append('<option value="' + op + '">' + option.name + '</option>');
+            });
+
+            // Operation change handler
+            $("#node-input-operation").change(function() {
+                var operation = $(this).val();
+                var config = sshOperations[operation];
+                
+                // Update description
+                $("#operation-description").text(config.description);
+                
+                // Show/hide fields based on operation
+                updateFieldVisibility(config);
+            });
+
+            function updateFieldVisibility(config) {
+                // Device UUID field
+                if (config.requiredFields.includes("deviceUuid")) {
+                    $("#device-uuid-row").show();
+                    $("#device-uuid-label").text("Device UUID *");
+                    $("#node-input-deviceUuid").attr("required", true);
+                } else {
+                    $("#device-uuid-row").hide();
+                    $("#node-input-deviceUuid").attr("required", false);
+                }
+
+                // Command field
+                if (config.requiredFields.includes("command")) {
+                    $("#command-row").show();
+                    $("#command-label").text("Command *");
+                    $("#node-input-command").attr("required", true);
+                } else {
+                    $("#command-row").hide();
+                    $("#node-input-command").attr("required", false);
+                }
+
+                // Container field
+                if (config.requiredFields.includes("container") || config.optionalFields.includes("container")) {
+                    $("#container-row").show();
+                    if (config.requiredFields.includes("container")) {
+                        $("#container-label").text("Container *");
+                        $("#node-input-container").attr("required", true);
+                    } else {
+                        $("#container-label").text("Container");
+                        $("#node-input-container").attr("required", false);
+                    }
+                } else {
+                    $("#container-row").hide();
+                    $("#node-input-container").attr("required", false);
+                }
+
+                // Show/hide operation-specific sections
+                $(".operation-specific").hide();
+                
+                if (["tunnel"].includes($("#node-input-operation").val())) {
+                    $("#tunnel-section").show();
+                }
+                
+                if (["file_transfer"].includes($("#node-input-operation").val())) {
+                    $("#file-transfer-section").show();
+                }
+            }
+
+            // Initialize with current operation
+            $("#node-input-operation").trigger('change');
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="balena-ssh">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="SSH node name">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-operation"><i class="fa fa-cogs"></i> Operation</label>
+        <select id="node-input-operation">
+            <option value="command">Execute Command</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <div id="operation-description" style="font-style: italic; color: #666; margin-top: 5px;">
+            Execute a command on the device via SSH
+        </div>
+    </div>
+
+    <div class="form-row" id="device-uuid-row">
+        <label for="node-input-deviceUuid" id="device-uuid-label"><i class="fa fa-microchip"></i> Device UUID</label>
+        <input type="text" id="node-input-deviceUuid" placeholder="Device UUID (e.g., 1234567890abcdef)">
+    </div>
+
+    <div class="form-row" id="command-row">
+        <label for="node-input-command" id="command-label"><i class="fa fa-terminal"></i> Command</label>
+        <input type="text" id="node-input-command" placeholder="Command to execute (e.g., ls -la)">
+    </div>
+
+    <div class="form-row" id="container-row">
+        <label for="node-input-container" id="container-label"><i class="fa fa-cube"></i> Container</label>
+        <input type="text" id="node-input-container" placeholder="Service/container name (optional)">
+    </div>
+
+    <!-- Operation-specific sections -->
+    <div id="tunnel-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-localPort"><i class="fa fa-plug"></i> Local Port</label>
+            <input type="number" id="node-input-localPort" placeholder="8080" min="1" max="65535">
+        </div>
+        <div class="form-row">
+            <label for="node-input-remotePort"><i class="fa fa-share"></i> Remote Port</label>
+            <input type="number" id="node-input-remotePort" placeholder="80" min="1" max="65535">
+        </div>
+        <div class="form-row">
+            <label for="node-input-remoteHost"><i class="fa fa-server"></i> Remote Host</label>
+            <input type="text" id="node-input-remoteHost" placeholder="localhost">
+        </div>
+    </div>
+
+    <div id="file-transfer-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-source"><i class="fa fa-file"></i> Source Path</label>
+            <input type="text" id="node-input-source" placeholder="Source file/directory path">
+        </div>
+        <div class="form-row">
+            <label for="node-input-destination"><i class="fa fa-folder"></i> Destination Path</label>
+            <input type="text" id="node-input-destination" placeholder="Destination file/directory path">
+        </div>
+        <div class="form-row">
+            <label for="node-input-direction"><i class="fa fa-exchange"></i> Direction</label>
+            <select id="node-input-direction">
+                <option value="upload">Upload (local to device)</option>
+                <option value="download">Download (device to local)</option>
+            </select>
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="form-row">
+        <label for="node-input-sshPort"><i class="fa fa-plug"></i> SSH Port</label>
+        <input type="number" id="node-input-sshPort" placeholder="22222" min="1" max="65535">
+    </div>
+
+    <div class="form-row">
+        <input type="checkbox" id="node-input-useBuiltInSsh" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-useBuiltInSsh" style="width: 70%;"> Use Balena CLI SSH</label>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-timeout"><i class="fa fa-clock-o"></i> Timeout (ms)</label>
+        <input type="number" id="node-input-timeout" placeholder="30000" min="1000">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="balena-ssh">
+    <p>A Node-RED node for SSH operations on Balena devices.</p>
+
+    <h3>Operations</h3>
+    <ul>
+        <li><strong>Execute Command</strong> - Run a command on the device</li>
+        <li><strong>Interactive Session Info</strong> - Get connection details for manual SSH</li>
+        <li><strong>SSH Tunnel</strong> - Create port forwarding tunnel</li>
+        <li><strong>File Transfer</strong> - Transfer files (placeholder implementation)</li>
+        <li><strong>Host OS Command</strong> - Execute commands on host OS</li>
+    </ul>
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>operation <span class="property-type">string</span></dt>
+        <dd>Override the configured operation</dd>
+        
+        <dt>deviceUuid <span class="property-type">string</span></dt>
+        <dd>Override the configured device UUID</dd>
+        
+        <dt>command <span class="property-type">string</span></dt>
+        <dd>Command to execute</dd>
+        
+        <dt>container <span class="property-type">string</span></dt>
+        <dd>Service/container name for specific container access</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object</span></dt>
+        <dd>Command execution result with stdout, stderr, and exit code</dd>
+        
+        <dt>operation <span class="property-type">string</span></dt>
+        <dd>The operation that was executed</dd>
+    </dl>
+
+    <h3>Details</h3>
+    <p>This node provides SSH access to Balena devices through the Balena CLI. 
+    It can execute commands in containers or on the host OS, create tunnels, and manage file transfers.</p>
+    
+    <p>The "Use Balena CLI SSH" option leverages balena ssh command for authenticated access. 
+    Disable this for direct SSH connections (requires proper key management).</p>
+
+    <h3>Prerequisites</h3>
+    <ul>
+        <li>Balena CLI installed and authenticated</li>
+        <li>Device must be online and accessible</li>
+        <li>SSH access enabled on the device</li>
+    </ul>
+</script> 

@@ -1,0 +1,408 @@
+<!-- Balena Deploy Node Configuration -->
+<script type="text/javascript">
+    RED.nodes.registerType('balena-deploy', {
+        category: 'balena',
+        color: '#FF5722',
+        defaults: {
+            name: {value: ""},
+            operation: {value: "push", required: true},
+            fleetName: {value: ""},
+            sourceDirectory: {value: ""},
+            dockerfile: {value: ""},
+            nocache: {value: false},
+            emulated: {value: false},
+            detached: {value: false},
+            timeout: {value: 1800000, validate: function(v) { return v > 0; }},
+            outputFormat: {value: "text"}
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-rocket",
+        label: function() {
+            if (this.name) {
+                return this.name;
+            }
+            return "balena-deploy: " + this.operation;
+        },
+        labelStyle: function() {
+            return this.name ? "node_label_italic" : "";
+        },
+        oneditprepare: function() {
+            var node = this;
+
+            // Deploy operations
+            var deployOperations = {
+                push: {
+                    name: "Push Code",
+                    description: "Build and deploy code to a fleet",
+                    requiredFields: ["fleetName"],
+                    optionalFields: ["sourceDirectory", "dockerfile", "nocache", "emulated", "detached"]
+                },
+                build: {
+                    name: "Local Build",
+                    description: "Build code locally for a fleet",
+                    requiredFields: ["fleetName"],
+                    optionalFields: ["sourceDirectory", "dockerfile", "deviceType", "nocache", "emulated"]
+                },
+                deploy: {
+                    name: "Deploy Image",
+                    description: "Deploy a pre-built image to a fleet",
+                    requiredFields: ["fleetName", "imageTag"],
+                    optionalFields: ["sourceDirectory"]
+                },
+                preload: {
+                    name: "Preload Image",
+                    description: "Preload an image onto a disk",
+                    requiredFields: ["fleetName", "imagePath"],
+                    optionalFields: ["deviceType", "commit"]
+                },
+                release_finalize: {
+                    name: "Finalize Release",
+                    description: "Mark a release as finalized",
+                    requiredFields: ["releaseId"],
+                    optionalFields: []
+                },
+                release_invalidate: {
+                    name: "Invalidate Release",
+                    description: "Mark a release as invalid",
+                    requiredFields: ["releaseId"],
+                    optionalFields: []
+                },
+                join: {
+                    name: "Device Join Fleet",
+                    description: "Move a device to a fleet",
+                    requiredFields: ["deviceUuid", "fleetName"],
+                    optionalFields: []
+                },
+                leave: {
+                    name: "Device Leave Fleet",
+                    description: "Remove a device from its fleet",
+                    requiredFields: ["deviceUuid"],
+                    optionalFields: []
+                },
+                os_configure: {
+                    name: "Configure OS Image",
+                    description: "Configure a Balena OS image",
+                    requiredFields: ["imagePath"],
+                    optionalFields: ["configPath", "fleet", "version"]
+                },
+                local_configure: {
+                    name: "Configure Local Device",
+                    description: "Configure a local device for a fleet",
+                    requiredFields: ["target", "fleetName"],
+                    optionalFields: []
+                }
+            };
+
+            // Initialize operation dropdown
+            var operationSelect = $("#node-input-operation");
+            operationSelect.empty();
+            Object.keys(deployOperations).forEach(function(op) {
+                var option = deployOperations[op];
+                operationSelect.append('<option value="' + op + '">' + option.name + '</option>');
+            });
+
+            // Operation change handler
+            $("#node-input-operation").change(function() {
+                var operation = $(this).val();
+                var config = deployOperations[operation];
+                
+                // Update description
+                $("#operation-description").text(config.description);
+                
+                // Show/hide fields based on operation
+                updateFieldVisibility(config);
+            });
+
+            function updateFieldVisibility(config) {
+                // Fleet name field
+                if (config.requiredFields.includes("fleetName")) {
+                    $("#fleet-name-row").show();
+                    $("#fleet-name-label").text("Fleet Name *");
+                    $("#node-input-fleetName").attr("required", true);
+                } else if (config.optionalFields.includes("fleetName")) {
+                    $("#fleet-name-row").show();
+                    $("#fleet-name-label").text("Fleet Name");
+                    $("#node-input-fleetName").attr("required", false);
+                } else {
+                    $("#fleet-name-row").hide();
+                    $("#node-input-fleetName").attr("required", false);
+                }
+
+                // Source directory field
+                if (config.requiredFields.includes("sourceDirectory") || config.optionalFields.includes("sourceDirectory")) {
+                    $("#source-directory-row").show();
+                    if (config.requiredFields.includes("sourceDirectory")) {
+                        $("#source-directory-label").text("Source Directory *");
+                        $("#node-input-sourceDirectory").attr("required", true);
+                    } else {
+                        $("#source-directory-label").text("Source Directory");
+                        $("#node-input-sourceDirectory").attr("required", false);
+                    }
+                } else {
+                    $("#source-directory-row").hide();
+                    $("#node-input-sourceDirectory").attr("required", false);
+                }
+
+                // Dockerfile field
+                if (config.optionalFields.includes("dockerfile")) {
+                    $("#dockerfile-row").show();
+                } else {
+                    $("#dockerfile-row").hide();
+                }
+
+                // Build options
+                if (config.optionalFields.includes("nocache") || config.optionalFields.includes("emulated") || config.optionalFields.includes("detached")) {
+                    $("#build-options-section").show();
+                } else {
+                    $("#build-options-section").hide();
+                }
+
+                // Show/hide operation-specific sections
+                $(".operation-specific").hide();
+                
+                var operation = $("#node-input-operation").val();
+                if (["deploy"].includes(operation)) {
+                    $("#deploy-section").show();
+                }
+                
+                if (["preload"].includes(operation)) {
+                    $("#preload-section").show();
+                }
+                
+                if (["release_finalize", "release_invalidate"].includes(operation)) {
+                    $("#release-section").show();
+                }
+                
+                if (["join", "leave"].includes(operation)) {
+                    $("#device-section").show();
+                }
+                
+                if (["os_configure"].includes(operation)) {
+                    $("#os-configure-section").show();
+                }
+                
+                if (["local_configure"].includes(operation)) {
+                    $("#local-configure-section").show();
+                }
+                
+                if (["build"].includes(operation)) {
+                    $("#build-specific-section").show();
+                }
+            }
+
+            // Initialize with current operation
+            $("#node-input-operation").trigger('change');
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="balena-deploy">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Deploy node name">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-operation"><i class="fa fa-cogs"></i> Operation</label>
+        <select id="node-input-operation">
+            <option value="push">Push Code</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <div id="operation-description" style="font-style: italic; color: #666; margin-top: 5px;">
+            Build and deploy code to a fleet
+        </div>
+    </div>
+
+    <div class="form-row" id="fleet-name-row">
+        <label for="node-input-fleetName" id="fleet-name-label"><i class="fa fa-ship"></i> Fleet Name</label>
+        <input type="text" id="node-input-fleetName" placeholder="Fleet name">
+    </div>
+
+    <div class="form-row" id="source-directory-row">
+        <label for="node-input-sourceDirectory" id="source-directory-label"><i class="fa fa-folder"></i> Source Directory</label>
+        <input type="text" id="node-input-sourceDirectory" placeholder="Source code directory (default: current)">
+    </div>
+
+    <div class="form-row" id="dockerfile-row">
+        <label for="node-input-dockerfile"><i class="fa fa-file"></i> Dockerfile</label>
+        <input type="text" id="node-input-dockerfile" placeholder="Custom Dockerfile path (optional)">
+    </div>
+
+    <!-- Build options section -->
+    <div id="build-options-section">
+        <hr>
+        <h4>Build Options</h4>
+        
+        <div class="form-row">
+            <input type="checkbox" id="node-input-nocache" style="display: inline-block; width: auto; vertical-align: top;">
+            <label for="node-input-nocache" style="width: 70%;"> No Cache</label>
+            <div style="font-style: italic; color: #666; margin-left: 20px;">
+                Don't use build cache
+            </div>
+        </div>
+
+        <div class="form-row">
+            <input type="checkbox" id="node-input-emulated" style="display: inline-block; width: auto; vertical-align: top;">
+            <label for="node-input-emulated" style="width: 70%;"> Emulated Build</label>
+            <div style="font-style: italic; color: #666; margin-left: 20px;">
+                Use emulation for cross-platform builds
+            </div>
+        </div>
+
+        <div class="form-row">
+            <input type="checkbox" id="node-input-detached" style="display: inline-block; width: auto; vertical-align: top;">
+            <label for="node-input-detached" style="width: 70%;"> Detached</label>
+            <div style="font-style: italic; color: #666; margin-left: 20px;">
+                Don't wait for build completion
+            </div>
+        </div>
+    </div>
+
+    <!-- Operation-specific sections -->
+    <div id="deploy-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-imageTag"><i class="fa fa-tag"></i> Image Tag</label>
+            <input type="text" id="node-input-imageTag" placeholder="Docker image tag to deploy">
+        </div>
+    </div>
+
+    <div id="preload-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-imagePath"><i class="fa fa-file"></i> Image Path</label>
+            <input type="text" id="node-input-imagePath" placeholder="Path to OS image file">
+        </div>
+        <div class="form-row">
+            <label for="node-input-deviceType"><i class="fa fa-microchip"></i> Device Type</label>
+            <input type="text" id="node-input-deviceType" placeholder="Device type (optional)">
+        </div>
+        <div class="form-row">
+            <label for="node-input-commit"><i class="fa fa-code-fork"></i> Commit</label>
+            <input type="text" id="node-input-commit" placeholder="Specific commit to preload (optional)">
+        </div>
+    </div>
+
+    <div id="release-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-releaseId"><i class="fa fa-code-fork"></i> Release ID</label>
+            <input type="text" id="node-input-releaseId" placeholder="Release ID">
+        </div>
+    </div>
+
+    <div id="device-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-deviceUuid"><i class="fa fa-microchip"></i> Device UUID</label>
+            <input type="text" id="node-input-deviceUuid" placeholder="Device UUID">
+        </div>
+    </div>
+
+    <div id="os-configure-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-configPath"><i class="fa fa-file"></i> Config Path</label>
+            <input type="text" id="node-input-configPath" placeholder="Configuration file path (optional)">
+        </div>
+        <div class="form-row">
+            <label for="node-input-osVersion"><i class="fa fa-tag"></i> OS Version</label>
+            <input type="text" id="node-input-osVersion" placeholder="OS version (optional)">
+        </div>
+    </div>
+
+    <div id="local-configure-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-target"><i class="fa fa-bullseye"></i> Target</label>
+            <input type="text" id="node-input-target" placeholder="Local device target">
+        </div>
+    </div>
+
+    <div id="build-specific-section" class="operation-specific" style="display: none;">
+        <div class="form-row">
+            <label for="node-input-buildDeviceType"><i class="fa fa-microchip"></i> Device Type</label>
+            <input type="text" id="node-input-buildDeviceType" placeholder="Device type for build (optional)">
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="form-row">
+        <label for="node-input-timeout"><i class="fa fa-clock-o"></i> Timeout (ms)</label>
+        <input type="number" id="node-input-timeout" placeholder="1800000" min="30000">
+        <div style="font-style: italic; color: #666; margin-top: 5px;">
+            30 minutes default for build operations
+        </div>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="balena-deploy">
+    <p>A Node-RED node for deploying code and managing releases with Balena.</p>
+
+    <h3>Operations</h3>
+    <ul>
+        <li><strong>Push Code</strong> - Build and deploy source code to a fleet</li>
+        <li><strong>Local Build</strong> - Build code locally without deployment</li>
+        <li><strong>Deploy Image</strong> - Deploy a pre-built Docker image</li>
+        <li><strong>Preload Image</strong> - Preload application onto an OS image</li>
+        <li><strong>Release Management</strong> - Finalize or invalidate releases</li>
+        <li><strong>Device Management</strong> - Move devices between fleets</li>
+        <li><strong>OS Configuration</strong> - Configure Balena OS images</li>
+        <li><strong>Local Configuration</strong> - Set up local development devices</li>
+    </ul>
+
+    <h3>Build Options</h3>
+    <ul>
+        <li><strong>No Cache</strong> - Disable Docker build cache for fresh builds</li>
+        <li><strong>Emulated</strong> - Use emulation for cross-architecture builds</li>
+        <li><strong>Detached</strong> - Start build without waiting for completion</li>
+    </ul>
+
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>operation <span class="property-type">string</span></dt>
+        <dd>Override the configured operation</dd>
+        
+        <dt>fleetName <span class="property-type">string</span></dt>
+        <dd>Override the configured fleet name</dd>
+        
+        <dt>sourceDirectory <span class="property-type">string</span></dt>
+        <dd>Path to source code directory</dd>
+        
+        <dt>dockerfile <span class="property-type">string</span></dt>
+        <dd>Custom Dockerfile path</dd>
+        
+        <dt>nocache <span class="property-type">boolean</span></dt>
+        <dd>Disable build cache</dd>
+        
+        <dt>emulated <span class="property-type">boolean</span></dt>
+        <dd>Use emulated builds</dd>
+        
+        <dt>detached <span class="property-type">boolean</span></dt>
+        <dd>Run build in detached mode</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload <span class="property-type">object</span></dt>
+        <dd>Build/deployment result with build info, release ID, and status</dd>
+        
+        <dt>operation <span class="property-type">string</span></dt>
+        <dd>The operation that was executed</dd>
+    </dl>
+
+    <h3>Details</h3>
+    <p>This node handles code deployment and build operations for Balena IoT applications. 
+    It supports local builds, cloud builds, image preloading, and release management.</p>
+    
+    <p>Build operations can take significant time (minutes to hours depending on code complexity). 
+    The timeout is set to 30 minutes by default but can be adjusted based on your needs.</p>
+    
+    <p>The node provides real-time status updates during long-running operations like builds and deployments.</p>
+
+    <h3>Prerequisites</h3>
+    <ul>
+        <li>Balena CLI installed and authenticated</li>
+        <li>Valid source code with Dockerfile or docker-compose.yml</li>
+        <li>Appropriate permissions for the target fleet</li>
+        <li>Docker installed for local build operations</li>
+    </ul>
+</script> 
