@@ -5,6 +5,7 @@
         color: '#FFA500',
         defaults: {
             name: {value: ""},
+            balenaConfig: {value: "", type: "balena-config", required: true},
             operation: {value: "command", required: true},
             deviceUuid: {value: ""},
             command: {value: ""},
@@ -100,6 +101,11 @@
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
         <input type="text" id="node-input-name" placeholder="SSH Management">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-balenaConfig"><i class="fa fa-cog"></i> Balena Config</label>
+        <input type="text" id="node-input-balenaConfig">
     </div>
 
     <div class="form-row">

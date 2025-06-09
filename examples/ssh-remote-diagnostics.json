@@ -1,0 +1,516 @@
+[
+    {
+        "id": "config3",
+        "type": "balena-config",
+        "name": "Balena SSH Config",
+        "loginMethod": "apiToken",
+        "apiToken": "your_api_token_here",
+        "balenaUrl": "https://api.balena-cloud.com",
+        "autoLogin": true
+    },
+    {
+        "id": "tab3",
+        "type": "tab",
+        "label": "SSH Remote Diagnostics",
+        "disabled": false,
+        "info": "SSH and remote diagnostics flow demonstrating command execution, system monitoring, and tunneling capabilities.",
+        "env": []
+    },
+    {
+        "id": "inject11",
+        "type": "inject",
+        "name": "System Status Check",
+        "props": [
+            {
+                "p": "deviceUuid",
+                "v": "your_device_uuid_here",
+                "vt": "str"
+            },
+            {
+                "p": "command",
+                "v": "df -h && free -h && uptime",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 160,
+        "y": 80,
+        "z": "tab3",
+        "wires": [
+            [
+                "ssh-system-check"
+            ]
+        ]
+    },
+    {
+        "id": "ssh-system-check",
+        "type": "balena-ssh",
+        "name": "System Check",
+        "balenaConfig": "config3",
+        "operation": "command",
+        "deviceUuid": "",
+        "command": "",
+        "container": "",
+        "timeout": 30000,
+        "sshPort": 22222,
+        "x": 380,
+        "y": 80,
+        "z": "tab3",
+        "wires": [
+            [
+                "parse-system-info"
+            ]
+        ]
+    },
+    {
+        "id": "parse-system-info",
+        "type": "function",
+        "name": "Parse System Info",
+        "func": "const output = msg.payload.stdout;\nconst lines = output.split('\\n');\n\n// Basic parsing of system information\nmsg.payload = {\n    timestamp: new Date().toISOString(),\n    deviceUuid: msg.deviceUuid,\n    systemInfo: {\n        rawOutput: output,\n        diskUsage: lines.filter(line => line.includes('/')).slice(0, 5),\n        memoryInfo: lines.filter(line => line.includes('Mem:') || line.includes('Swap:')),\n        uptime: lines.filter(line => line.includes('up'))[0] || 'Unknown'\n    }\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 590,
+        "y": 80,
+        "z": "tab3",
+        "wires": [
+            [
+                "system-debug"
+            ]
+        ]
+    },
+    {
+        "id": "system-debug",
+        "type": "debug",
+        "name": "System Status",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 800,
+        "y": 80,
+        "z": "tab3",
+        "wires": []
+    },
+    {
+        "id": "inject12",
+        "type": "inject",
+        "name": "Container Logs",
+        "props": [
+            {
+                "p": "deviceUuid",
+                "v": "your_device_uuid_here",
+                "vt": "str"
+            },
+            {
+                "p": "command",
+                "v": "docker ps -a && docker logs --tail 20 $(docker ps -q | head -1)",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 150,
+        "y": 160,
+        "z": "tab3",
+        "wires": [
+            [
+                "ssh-container-logs"
+            ]
+        ]
+    },
+    {
+        "id": "ssh-container-logs",
+        "type": "balena-ssh",
+        "name": "Container Logs",
+        "balenaConfig": "config3",
+        "operation": "command",
+        "deviceUuid": "",
+        "command": "",
+        "container": "",
+        "timeout": 30000,
+        "sshPort": 22222,
+        "x": 370,
+        "y": 160,
+        "z": "tab3",
+        "wires": [
+            [
+                "format-logs"
+            ]
+        ]
+    },
+    {
+        "id": "format-logs",
+        "type": "function",
+        "name": "Format Logs",
+        "func": "const output = msg.payload.stdout;\n\nmsg.payload = {\n    timestamp: new Date().toISOString(),\n    deviceUuid: msg.deviceUuid,\n    containerInfo: {\n        logs: output,\n        summary: `Retrieved logs from device ${msg.deviceUuid}`\n    }\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 560,
+        "y": 160,
+        "z": "tab3",
+        "wires": [
+            [
+                "logs-debug"
+            ]
+        ]
+    },
+    {
+        "id": "logs-debug",
+        "type": "debug",
+        "name": "Container Logs",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 760,
+        "y": 160,
+        "z": "tab3",
+        "wires": []
+    },
+    {
+        "id": "inject13",
+        "type": "inject",
+        "name": "Network Diagnostics",
+        "props": [
+            {
+                "p": "deviceUuid",
+                "v": "your_device_uuid_here",
+                "vt": "str"
+            },
+            {
+                "p": "command",
+                "v": "ping -c 3 8.8.8.8 && curl -I https://httpbin.org/get",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 170,
+        "y": 240,
+        "z": "tab3",
+        "wires": [
+            [
+                "ssh-network-test"
+            ]
+        ]
+    },
+    {
+        "id": "ssh-network-test",
+        "type": "balena-ssh",
+        "name": "Network Test",
+        "balenaConfig": "config3",
+        "operation": "command",
+        "deviceUuid": "",
+        "command": "",
+        "container": "",
+        "timeout": 30000,
+        "sshPort": 22222,
+        "x": 380,
+        "y": 240,
+        "z": "tab3",
+        "wires": [
+            [
+                "analyze-network"
+            ]
+        ]
+    },
+    {
+        "id": "analyze-network",
+        "type": "function",
+        "name": "Analyze Network",
+        "func": "const output = msg.payload.stdout;\nconst stderr = msg.payload.stderr;\n\n// Simple network analysis\nconst pingSuccess = output.includes('0% packet loss');\nconst internetAccess = output.includes('HTTP/') || output.includes('200 OK');\n\nmsg.payload = {\n    timestamp: new Date().toISOString(),\n    deviceUuid: msg.deviceUuid,\n    networkStatus: {\n        pingTest: pingSuccess ? 'PASS' : 'FAIL',\n        internetAccess: internetAccess ? 'PASS' : 'FAIL',\n        rawOutput: output,\n        errors: stderr\n    }\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 580,
+        "y": 240,
+        "z": "tab3",
+        "wires": [
+            [
+                "network-debug"
+            ]
+        ]
+    },
+    {
+        "id": "network-debug",
+        "type": "debug",
+        "name": "Network Status",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 790,
+        "y": 240,
+        "z": "tab3",
+        "wires": []
+    },
+    {
+        "id": "inject14",
+        "type": "inject",
+        "name": "Service in Container",
+        "props": [
+            {
+                "p": "deviceUuid",
+                "v": "your_device_uuid_here",
+                "vt": "str"
+            },
+            {
+                "p": "command",
+                "v": "ps aux | head -10",
+                "vt": "str"
+            },
+            {
+                "p": "container",
+                "v": "main",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 170,
+        "y": 320,
+        "z": "tab3",
+        "wires": [
+            [
+                "ssh-container-exec"
+            ]
+        ]
+    },
+    {
+        "id": "ssh-container-exec",
+        "type": "balena-ssh",
+        "name": "Container Exec",
+        "balenaConfig": "config3",
+        "operation": "command",
+        "deviceUuid": "",
+        "command": "",
+        "container": "",
+        "timeout": 30000,
+        "sshPort": 22222,
+        "x": 390,
+        "y": 320,
+        "z": "tab3",
+        "wires": [
+            [
+                "container-result"
+            ]
+        ]
+    },
+    {
+        "id": "container-result",
+        "type": "debug",
+        "name": "Container Exec",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 610,
+        "y": 320,
+        "z": "tab3",
+        "wires": []
+    },
+    {
+        "id": "inject15",
+        "type": "inject",
+        "name": "Create SSH Tunnel",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"deviceUuid\":\"your_device_uuid_here\",\"localPort\":8080,\"remotePort\":80,\"remoteHost\":\"localhost\"}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 170,
+        "y": 400,
+        "z": "tab3",
+        "wires": [
+            [
+                "ssh-tunnel"
+            ]
+        ]
+    },
+    {
+        "id": "ssh-tunnel",
+        "type": "balena-ssh",
+        "name": "SSH Tunnel",
+        "balenaConfig": "config3",
+        "operation": "tunnel",
+        "deviceUuid": "",
+        "command": "",
+        "container": "",
+        "timeout": 30000,
+        "sshPort": 22222,
+        "x": 370,
+        "y": 400,
+        "z": "tab3",
+        "wires": [
+            [
+                "tunnel-info"
+            ]
+        ]
+    },
+    {
+        "id": "tunnel-info",
+        "type": "function",
+        "name": "Tunnel Instructions",
+        "func": "const result = msg.payload;\n\nmsg.payload = {\n    message: 'SSH Tunnel Configuration Ready',\n    instructions: {\n        command: result.command,\n        localPort: result.localPort,\n        remotePort: result.remotePort,\n        remoteHost: result.remoteHost,\n        usage: `Run the command in a terminal to establish tunnel, then access http://localhost:${result.localPort}`\n    },\n    deviceUuid: msg.deviceUuid\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 580,
+        "y": 400,
+        "z": "tab3",
+        "wires": [
+            [
+                "tunnel-debug"
+            ]
+        ]
+    },
+    {
+        "id": "tunnel-debug",
+        "type": "debug",
+        "name": "Tunnel Info",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 760,
+        "y": 400,
+        "z": "tab3",
+        "wires": []
+    },
+    {
+        "id": "inject16",
+        "type": "inject",
+        "name": "Host OS Command",
+        "props": [
+            {
+                "p": "deviceUuid",
+                "v": "your_device_uuid_here",
+                "vt": "str"
+            },
+            {
+                "p": "command",
+                "v": "cat /proc/version && lscpu | head -5",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 160,
+        "y": 480,
+        "z": "tab3",
+        "wires": [
+            [
+                "ssh-host-os"
+            ]
+        ]
+    },
+    {
+        "id": "ssh-host-os",
+        "type": "balena-ssh",
+        "name": "Host OS",
+        "balenaConfig": "config3",
+        "operation": "host_os",
+        "deviceUuid": "",
+        "command": "",
+        "container": "",
+        "timeout": 30000,
+        "sshPort": 22222,
+        "x": 350,
+        "y": 480,
+        "z": "tab3",
+        "wires": [
+            [
+                "host-info"
+            ]
+        ]
+    },
+    {
+        "id": "host-info",
+        "type": "function",
+        "name": "Host System Info",
+        "func": "const output = msg.payload.stdout;\n\nmsg.payload = {\n    timestamp: new Date().toISOString(),\n    deviceUuid: msg.deviceUuid,\n    hostSystem: {\n        kernelInfo: output.split('\\n')[0] || 'Unknown',\n        cpuInfo: output.split('\\n').slice(1).join('\\n'),\n        rawOutput: output\n    }\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 480,
+        "z": "tab3",
+        "wires": [
+            [
+                "host-debug"
+            ]
+        ]
+    },
+    {
+        "id": "host-debug",
+        "type": "debug",
+        "name": "Host Info",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 730,
+        "y": 480,
+        "z": "tab3",
+        "wires": []
+    }
+] 

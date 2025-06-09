@@ -117,10 +117,10 @@ The config node shows its status in the Node-RED editor:
 The following nodes need to be updated with this authentication pattern:
 
 - ✅ `balena-device` - Updated (example implementation)
-- ⏳ `balena-fleet` - Needs update
-- ⏳ `balena-ssh` - Needs update  
-- ⏳ `balena-variables` - Needs update
-- ⏳ `balena-deploy` - Needs update
+- ✅ `balena-fleet` - Updated in v1.1.0
+- ✅ `balena-ssh` - Updated in v1.1.0
+- ⏳ `balena-variables` - Needs update (planned for v1.2.0)
+- ⏳ `balena-deploy` - Needs update (planned for v1.2.0)
 - ✅ `balena-supervisor` - Uses direct API (no CLI auth needed)
 
 ## Security Considerations

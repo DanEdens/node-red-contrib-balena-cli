@@ -1,0 +1,431 @@
+[
+    {
+        "id": "config4",
+        "type": "balena-config",
+        "name": "Balena CI/CD Config",
+        "loginMethod": "apiToken",
+        "apiToken": "your_api_token_here",
+        "balenaUrl": "https://api.balena-cloud.com",
+        "autoLogin": true
+    },
+    {
+        "id": "tab4",
+        "type": "tab",
+        "label": "CI/CD Deployment Pipeline",
+        "disabled": false,
+        "info": "Complete CI/CD pipeline demonstrating automated testing, deployment, rollback capabilities, and monitoring.",
+        "env": []
+    },
+    {
+        "id": "webhook-trigger",
+        "type": "http in",
+        "name": "Deployment Webhook",
+        "url": "/deploy",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 80,
+        "z": "tab4",
+        "wires": [
+            [
+                "validate-payload"
+            ]
+        ]
+    },
+    {
+        "id": "validate-payload",
+        "type": "function",
+        "name": "Validate Deployment",
+        "func": "// Validate incoming deployment request\nconst payload = msg.payload;\n\nif (!payload.fleetName || !payload.sourceDirectory) {\n    msg.statusCode = 400;\n    msg.payload = { error: 'Missing required fields: fleetName, sourceDirectory' };\n    return [null, msg]; // Send to error output\n}\n\n// Prepare deployment context\nmsg.deployment = {\n    id: Date.now().toString(),\n    fleetName: payload.fleetName,\n    sourceDirectory: payload.sourceDirectory,\n    branch: payload.branch || 'main',\n    commitHash: payload.commitHash || 'latest',\n    environment: payload.environment || 'production',\n    startTime: new Date().toISOString()\n};\n\nmsg.payload = {\n    message: 'Deployment validation successful',\n    deployment: msg.deployment\n};\n\nreturn [msg, null]; // Send to success output",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 360,
+        "y": 80,
+        "z": "tab4",
+        "wires": [
+            [
+                "pre-deploy-checks"
+            ],
+            [
+                "error-response"
+            ]
+        ]
+    },
+    {
+        "id": "pre-deploy-checks",
+        "type": "function",
+        "name": "Pre-Deploy Checks",
+        "func": "// Perform pre-deployment checks\nconst deployment = msg.deployment;\n\n// Check fleet exists and get current status\nmsg.fleetName = deployment.fleetName;\nmsg.payload = {\n    deployment: deployment,\n    step: 'pre-deploy-checks',\n    message: 'Checking fleet status and prerequisites'\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 590,
+        "y": 80,
+        "z": "tab4",
+        "wires": [
+            [
+                "check-fleet-status"
+            ]
+        ]
+    },
+    {
+        "id": "check-fleet-status",
+        "type": "balena-fleet",
+        "name": "Check Fleet",
+        "balenaConfig": "config4",
+        "operation": "info",
+        "fleetName": "",
+        "organization": "",
+        "deviceType": "",
+        "timeout": 30000,
+        "enableCaching": false,
+        "cacheDuration": 600,
+        "outputFormat": "json",
+        "x": 810,
+        "y": 80,
+        "z": "tab4",
+        "wires": [
+            [
+                "analyze-fleet"
+            ]
+        ]
+    },
+    {
+        "id": "analyze-fleet",
+        "type": "function",
+        "name": "Analyze Fleet Health",
+        "func": "const fleetInfo = msg.payload;\nconst deployment = msg.deployment;\n\n// Analyze fleet health before deployment\nconst deviceCount = fleetInfo.owns__device?.length || 0;\nconst onlineDevices = fleetInfo.owns__device?.filter(d => d.is_online)?.length || 0;\nconst healthPercentage = deviceCount > 0 ? (onlineDevices / deviceCount) * 100 : 0;\n\ndeployment.preDeployStatus = {\n    totalDevices: deviceCount,\n    onlineDevices: onlineDevices,\n    healthPercentage: healthPercentage,\n    readyForDeployment: healthPercentage >= 50 // At least 50% online\n};\n\nif (!deployment.preDeployStatus.readyForDeployment) {\n    msg.error = `Fleet health too low: ${healthPercentage}% online`;\n    return [null, msg]; // Send to error path\n}\n\nmsg.deployment = deployment;\nmsg.payload = {\n    deployment: deployment,\n    step: 'fleet-analysis',\n    message: `Fleet healthy: ${healthPercentage}% devices online`\n};\n\nreturn [msg, null]; // Send to success path",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1030,
+        "y": 80,
+        "z": "tab4",
+        "wires": [
+            [
+                "backup-current-release"
+            ],
+            [
+                "deployment-failed"
+            ]
+        ]
+    },
+    {
+        "id": "backup-current-release",
+        "type": "balena-fleet",
+        "name": "Get Current Release",
+        "balenaConfig": "config4",
+        "operation": "releases",
+        "fleetName": "",
+        "organization": "",
+        "deviceType": "",
+        "timeout": 30000,
+        "enableCaching": false,
+        "cacheDuration": 600,
+        "outputFormat": "json",
+        "x": 190,
+        "y": 180,
+        "z": "tab4",
+        "wires": [
+            [
+                "store-rollback-info"
+            ]
+        ]
+    },
+    {
+        "id": "store-rollback-info",
+        "type": "function",
+        "name": "Store Rollback Info",
+        "func": "const releases = msg.payload;\nconst deployment = msg.deployment;\n\n// Store current release for potential rollback\nif (releases && releases.length > 0) {\n    deployment.rollbackRelease = {\n        id: releases[0].id,\n        commit: releases[0].commit,\n        version: releases[0].release_version\n    };\n}\n\nmsg.deployment = deployment;\nmsg.payload = {\n    deployment: deployment,\n    step: 'rollback-preparation',\n    message: 'Rollback information stored'\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 430,
+        "y": 180,
+        "z": "tab4",
+        "wires": [
+            [
+                "start-deployment"
+            ]
+        ]
+    },
+    {
+        "id": "start-deployment",
+        "type": "function",
+        "name": "Prepare Deploy Command",
+        "func": "const deployment = msg.deployment;\n\n// Note: This would use balena-deploy node in a real scenario\n// For now, we'll simulate the deployment process\nmsg.payload = {\n    operation: 'push',\n    fleetName: deployment.fleetName,\n    sourceDirectory: deployment.sourceDirectory,\n    nocache: true,\n    deploymentId: deployment.id\n};\n\nmsg.deployment = deployment;\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 670,
+        "y": 180,
+        "z": "tab4",
+        "wires": [
+            [
+                "simulate-deploy"
+            ]
+        ]
+    },
+    {
+        "id": "simulate-deploy",
+        "type": "function",
+        "name": "Simulate Deployment",
+        "func": "// Simulate deployment process\n// In real scenario, this would be a balena-deploy node\nconst deployment = msg.deployment;\n\n// Simulate deployment success/failure (90% success rate)\nconst deploymentSuccess = Math.random() > 0.1;\n\ndeployment.deploymentResult = {\n    success: deploymentSuccess,\n    endTime: new Date().toISOString(),\n    duration: Date.now() - new Date(deployment.startTime).getTime()\n};\n\nif (deploymentSuccess) {\n    deployment.newReleaseId = 'release_' + Date.now();\n    msg.payload = {\n        deployment: deployment,\n        step: 'deployment-complete',\n        message: 'Code deployed successfully'\n    };\n    return [msg, null];\n} else {\n    msg.error = 'Deployment failed during build process';\n    msg.deployment = deployment;\n    return [null, msg];\n}",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 910,
+        "y": 180,
+        "z": "tab4",
+        "wires": [
+            [
+                "wait-for-rollout"
+            ],
+            [
+                "deployment-failed"
+            ]
+        ]
+    },
+    {
+        "id": "wait-for-rollout",
+        "type": "delay",
+        "name": "Wait for Rollout",
+        "pauseType": "delay",
+        "timeout": "10",
+        "timeoutUnits": "seconds",
+        "rate": "1",
+        "nbRateUnits": "1",
+        "rateUnits": "second",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": false,
+        "x": 1140,
+        "y": 180,
+        "z": "tab4",
+        "wires": [
+            [
+                "post-deploy-health"
+            ]
+        ]
+    },
+    {
+        "id": "post-deploy-health",
+        "type": "balena-device",
+        "name": "Check Device Health",
+        "balenaConfig": "config4",
+        "operation": "list",
+        "deviceUuid": "",
+        "fleetName": "",
+        "timeout": 30000,
+        "enableCaching": false,
+        "cacheDuration": 300,
+        "outputFormat": "json",
+        "x": 190,
+        "y": 280,
+        "z": "tab4",
+        "wires": [
+            [
+                "analyze-post-deploy"
+            ]
+        ]
+    },
+    {
+        "id": "analyze-post-deploy",
+        "type": "function",
+        "name": "Analyze Deployment Impact",
+        "func": "const devices = msg.payload;\nconst deployment = msg.deployment;\n\n// Filter devices for this fleet\nconst fleetDevices = devices.filter(d => \n    d.belongs_to__application && \n    d.belongs_to__application[0].app_name === deployment.fleetName\n);\n\nconst totalDevices = fleetDevices.length;\nconst onlineDevices = fleetDevices.filter(d => d.is_online).length;\nconst healthPercentage = totalDevices > 0 ? (onlineDevices / totalDevices) * 100 : 0;\n\ndeployment.postDeployStatus = {\n    totalDevices: totalDevices,\n    onlineDevices: onlineDevices,\n    healthPercentage: healthPercentage,\n    healthImprovement: healthPercentage - deployment.preDeployStatus.healthPercentage\n};\n\n// Determine if deployment was successful\nconst deploymentSuccess = healthPercentage >= 75; // Expect 75% or better post-deploy\n\nif (deploymentSuccess) {\n    msg.payload = {\n        deployment: deployment,\n        step: 'deployment-verified',\n        message: `Deployment successful: ${healthPercentage}% devices healthy`\n    };\n    return [msg, null];\n} else {\n    msg.error = `Post-deployment health check failed: ${healthPercentage}% healthy`;\n    msg.deployment = deployment;\n    return [null, msg];\n}",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 280,
+        "z": "tab4",
+        "wires": [
+            [
+                "deployment-success"
+            ],
+            [
+                "initiate-rollback"
+            ]
+        ]
+    },
+    {
+        "id": "deployment-success",
+        "type": "function",
+        "name": "Deployment Success",
+        "func": "const deployment = msg.deployment;\n\n// Create success response\nmsg.statusCode = 200;\nmsg.payload = {\n    success: true,\n    deploymentId: deployment.id,\n    fleetName: deployment.fleetName,\n    duration: deployment.deploymentResult.duration,\n    healthStatus: deployment.postDeployStatus,\n    message: 'Deployment completed successfully'\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 700,
+        "y": 280,
+        "z": "tab4",
+        "wires": [
+            [
+                "success-response",
+                "send-notification"
+            ]
+        ]
+    },
+    {
+        "id": "initiate-rollback",
+        "type": "function",
+        "name": "Prepare Rollback",
+        "func": "const deployment = msg.deployment;\n\nif (!deployment.rollbackRelease) {\n    msg.error = 'No rollback release available';\n    return [null, msg];\n}\n\nmsg.payload = {\n    fleetName: deployment.fleetName,\n    releaseId: deployment.rollbackRelease.id\n};\n\nmsg.deployment = deployment;\n\nreturn [msg, null];",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 710,
+        "y": 380,
+        "z": "tab4",
+        "wires": [
+            [
+                "execute-rollback"
+            ],
+            [
+                "deployment-failed"
+            ]
+        ]
+    },
+    {
+        "id": "execute-rollback",
+        "type": "balena-fleet",
+        "name": "Rollback Release",
+        "balenaConfig": "config4",
+        "operation": "pin_release",
+        "fleetName": "",
+        "organization": "",
+        "deviceType": "",
+        "timeout": 30000,
+        "enableCaching": false,
+        "cacheDuration": 600,
+        "outputFormat": "json",
+        "x": 940,
+        "y": 380,
+        "z": "tab4",
+        "wires": [
+            [
+                "rollback-success"
+            ]
+        ]
+    },
+    {
+        "id": "rollback-success",
+        "type": "function",
+        "name": "Rollback Complete",
+        "func": "const deployment = msg.deployment;\n\nmsg.statusCode = 206; // Partial Content - deployment rolled back\nmsg.payload = {\n    success: false,\n    rollback: true,\n    deploymentId: deployment.id,\n    fleetName: deployment.fleetName,\n    rolledBackTo: deployment.rollbackRelease,\n    message: 'Deployment failed and was rolled back'\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1160,
+        "y": 380,
+        "z": "tab4",
+        "wires": [
+            [
+                "success-response",
+                "send-notification"
+            ]
+        ]
+    },
+    {
+        "id": "deployment-failed",
+        "type": "function",
+        "name": "Deployment Failed",
+        "func": "const deployment = msg.deployment || {};\nconst error = msg.error || 'Unknown deployment error';\n\nmsg.statusCode = 500;\nmsg.payload = {\n    success: false,\n    deploymentId: deployment.id,\n    fleetName: deployment.fleetName,\n    error: error,\n    message: 'Deployment failed'\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1160,
+        "y": 480,
+        "z": "tab4",
+        "wires": [
+            [
+                "error-response",
+                "send-notification"
+            ]
+        ]
+    },
+    {
+        "id": "success-response",
+        "type": "http response",
+        "name": "Success Response",
+        "statusCode": "",
+        "headers": {},
+        "x": 960,
+        "y": 280,
+        "z": "tab4",
+        "wires": []
+    },
+    {
+        "id": "error-response",
+        "type": "http response",
+        "name": "Error Response",
+        "statusCode": "",
+        "headers": {},
+        "x": 950,
+        "y": 480,
+        "z": "tab4",
+        "wires": []
+    },
+    {
+        "id": "send-notification",
+        "type": "function",
+        "name": "Format Notification",
+        "func": "const result = msg.payload;\nconst isSuccess = result.success;\nconst isRollback = result.rollback;\n\nlet message;\nlet emoji;\n\nif (isSuccess) {\n    emoji = '✅';\n    message = `Deployment ${result.deploymentId} to ${result.fleetName} completed successfully in ${Math.round(result.duration/1000)}s`;\n} else if (isRollback) {\n    emoji = '🔄';\n    message = `Deployment ${result.deploymentId} to ${result.fleetName} failed and was rolled back`;\n} else {\n    emoji = '❌';\n    message = `Deployment ${result.deploymentId} to ${result.fleetName} failed: ${result.error}`;\n}\n\nmsg.payload = {\n    notification: {\n        title: `${emoji} Balena Deployment ${isSuccess ? 'Success' : 'Failed'}`,\n        message: message,\n        timestamp: new Date().toISOString(),\n        details: result\n    }\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 970,
+        "y": 580,
+        "z": "tab4",
+        "wires": [
+            [
+                "notification-debug"
+            ]
+        ]
+    },
+    {
+        "id": "notification-debug",
+        "type": "debug",
+        "name": "Deployment Notification",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload.notification",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1210,
+        "y": 580,
+        "z": "tab4",
+        "wires": []
+    }
+] 

@@ -1,5 +1,9 @@
 # node-red-contrib-balena-cli
 
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
+![Authentication](https://img.shields.io/badge/auth-integrated-green)
+![Nodes](https://img.shields.io/badge/nodes-6-brightgreen)
+
 A comprehensive Node-RED wrapper for the Balena CLI, providing powerful IoT device and fleet management capabilities directly within Node-RED flows.
 
 ## Overview
@@ -8,7 +12,7 @@ This Node-RED contribution package provides six specialized nodes that wrap the 
 
 - **balena-config**: Configuration node for authentication and connection management
 - **balena-device**: Device management and control
-- **balena-fleet**: Fleet lifecycle and configuration management  
+- **balena-fleet**: Fleet lifecycle and configuration management
 - **balena-ssh**: SSH access and command execution on devices
 - **balena-variables**: Environment variable management for fleets and devices
 - **balena-deploy**: Code deployment and release management
@@ -21,7 +25,7 @@ This Node-RED contribution package provides six specialized nodes that wrap the 
 The `balena-config` node provides centralized authentication management for all Balena operations. It supports three login methods:
 
 1. **Email & Password** - Traditional login with Balena account credentials
-2. **API Token** - Token-based authentication (recommended for production)  
+2. **API Token** - Token-based authentication (recommended for production)
 3. **Browser Login** - Interactive browser-based login (development only)
 
 #### Getting API Tokens
@@ -29,7 +33,7 @@ For production deployments, API tokens are recommended:
 
 1. Login to the [Balena Dashboard](https://dashboard.balena-cloud.com)
 2. Go to Preferences → Access Tokens
-3. Click "Create API Token" 
+3. Click "Create API Token"
 4. Give it a name and copy the token
 5. Use the token in your `balena-config` node
 
@@ -165,7 +169,7 @@ First, create a `balena-config` node:
 }
 ```
 
-### Environment Variable Management
+### 4. Environment Variable Management
 ```json
 {
   "operation": "set",
@@ -176,7 +180,9 @@ First, create a `balena-config` node:
 }
 ```
 
-### Code Deployment
+**Note**: `balena-variables` and `balena-deploy` nodes will be updated with authentication integration in v1.2.0. For now, ensure you're logged in via the CLI manually when using these nodes.
+
+### 5. Code Deployment
 ```json
 {
   "operation": "push",
@@ -186,19 +192,38 @@ First, create a `balena-config` node:
 }
 ```
 
+## 📚 Examples & Templates
+
+The package includes comprehensive example flows to help you get started quickly:
+
+### Ready-to-Use Examples
+- **`examples/basic-device-monitoring.json`** - Device health monitoring and alerting
+- **`examples/fleet-management.json`** - Fleet operations and release management  
+- **`examples/ssh-remote-diagnostics.json`** - Remote device diagnostics and troubleshooting
+- **`examples/cicd-deployment-pipeline.json`** - Complete CI/CD pipeline with rollback
+
+### How to Import Examples
+1. Open Node-RED → Menu → Import
+2. Select "choose file" and browse to the `examples/` directory
+3. Choose an example JSON file
+4. Configure with your API tokens and device/fleet details
+5. Deploy and test!
+
+For detailed setup instructions and customization tips, see [`examples/README.md`](examples/README.md).
+
 ## Node Documentation
 
 ### balena-device
 
-**Category:** balena  
-**Color:** #00AEEF (Balena Blue)  
+**Category:** balena
+**Color:** #00AEEF (Balena Blue)
 **Icon:** fa-microchip
 
 Manages Balena devices with operations including listing, information retrieval, power control, log access, and fleet management.
 
 **Operations:**
 - `list` - List devices (optionally filtered by fleet)
-- `info` - Get device details  
+- `info` - Get device details
 - `enable_local_mode` / `disable_local_mode` - Development mode control
 - `restart` / `shutdown` - Power management
 - `logs` - Retrieve device logs
@@ -209,15 +234,15 @@ Manages Balena devices with operations including listing, information retrieval,
 
 ### balena-fleet
 
-**Category:** balena  
-**Color:** #4CAF50 (Green)  
+**Category:** balena
+**Color:** #4CAF50 (Green)
 **Icon:** fa-ship
 
 Comprehensive fleet management including creation, configuration, release management, and device operations.
 
 **Operations:**
 - `list` / `info` - Fleet discovery and details
-- `create` / `delete` - Fleet lifecycle  
+- `create` / `delete` - Fleet lifecycle
 - `rename` - Fleet naming
 - `releases` - Release listing
 - `pin_release` / `track_latest` - Release strategy
@@ -228,8 +253,8 @@ Comprehensive fleet management including creation, configuration, release manage
 
 ### balena-ssh
 
-**Category:** balena  
-**Color:** #FFA500 (Orange)  
+**Category:** balena
+**Color:** #FFA500 (Orange)
 **Icon:** fa-terminal
 
 Provides SSH access to Balena devices for command execution, tunneling, and file operations.
@@ -243,8 +268,8 @@ Provides SSH access to Balena devices for command execution, tunneling, and file
 
 ### balena-variables
 
-**Category:** balena  
-**Color:** #9C27B0 (Purple)  
+**Category:** balena
+**Color:** #9C27B0 (Purple)
 **Icon:** fa-cog
 
 Manages environment and configuration variables at both fleet and device levels.
@@ -258,8 +283,8 @@ Manages environment and configuration variables at both fleet and device levels.
 
 ### balena-deploy
 
-**Category:** balena  
-**Color:** #FF5722 (Deep Orange)  
+**Category:** balena
+**Color:** #FF5722 (Deep Orange)
 **Icon:** fa-rocket
 
 Handles code deployment, building, and release management for Balena applications.
@@ -275,8 +300,8 @@ Handles code deployment, building, and release management for Balena application
 
 ### balena-supervisor
 
-**Category:** balena  
-**Color:** #8cc8ff (Light Blue)  
+**Category:** balena
+**Color:** #8cc8ff (Light Blue)
 **Icon:** balena.png
 
 Manages local supervisor operations for nodes running ON balena devices (not remote management).
@@ -331,7 +356,7 @@ msg = {
   cached: false,              // Force fresh execution
   // Node-specific properties...
   deviceUuid: "...",          // For device operations
-  fleetName: "...",           // For fleet operations  
+  fleetName: "...",           // For fleet operations
   command: "...",             // For SSH operations
   variableName: "...",        // For variable operations
   sourceDirectory: "..."      // For deployment operations
@@ -379,7 +404,7 @@ SSH into devices to run diagnostic commands:
 All nodes provide comprehensive error handling:
 
 - **CLI Errors** - Balena CLI command failures
-- **Authentication** - Invalid or expired credentials  
+- **Authentication** - Invalid or expired credentials
 - **Network Issues** - Connectivity problems
 - **Timeout Errors** - Operation timeouts
 - **Validation** - Invalid parameters or missing requirements
@@ -475,4 +500,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ by the MadnessEngineering team** 
+**Made with ❤️ by the MadnessEngineering team**

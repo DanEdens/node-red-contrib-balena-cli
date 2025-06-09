@@ -19,6 +19,14 @@ module.exports = function (RED)
         node.timeout = parseInt(config.timeout) || 30000;
         node.sshPort = parseInt(config.sshPort) || 22222;
 
+        // Get the configuration node
+        node.balenaConfig = RED.nodes.getNode(config.balenaConfig);
+        if (!node.balenaConfig)
+        {
+            node.error("No Balena configuration specified");
+            return;
+        }
+
         // Status tracking
         function updateStatus(text, color = "grey")
         {
@@ -32,30 +40,52 @@ module.exports = function (RED)
         // Execute Balena CLI SSH command
         function executeBalenaSshCommand(command, options = {})
         {
-            return new Promise((resolve, reject) =>
+            return new Promise(async (resolve, reject) =>
             {
-                const timeoutId = setTimeout(() =>
+                try
                 {
-                    reject(new Error(`Command timed out after ${node.timeout}ms`));
-                }, node.timeout);
-
-                exec(command, options, (error, stdout, stderr) =>
-                {
-                    clearTimeout(timeoutId);
-
-                    if (error)
+                    // Ensure we're authenticated
+                    const isAuthenticated = await node.balenaConfig.checkAuth();
+                    if (!isAuthenticated)
                     {
-                        reject(new Error(`Balena SSH error: ${error.message}\nStderr: ${stderr}`));
-                        return;
+                        // Try to login
+                        const loginSuccess = await node.balenaConfig.login();
+                        if (!loginSuccess)
+                        {
+                            reject(new Error("Balena authentication failed"));
+                            return;
+                        }
                     }
 
-                    resolve({
-                        success: true,
-                        stdout: stdout.trim(),
-                        stderr: stderr.trim(),
-                        exitCode: 0
+                    // Get the authenticated command
+                    const authenticatedCommand = node.balenaConfig.getAuthenticatedCommand(command);
+
+                    const timeoutId = setTimeout(() =>
+                    {
+                        reject(new Error(`Command timed out after ${node.timeout}ms`));
+                    }, node.timeout);
+
+                    exec(authenticatedCommand, options, (error, stdout, stderr) =>
+                    {
+                        clearTimeout(timeoutId);
+
+                        if (error)
+                        {
+                            reject(new Error(`Balena SSH error: ${error.message}\nStderr: ${stderr}`));
+                            return;
+                        }
+
+                        resolve({
+                            success: true,
+                            stdout: stdout.trim(),
+                            stderr: stderr.trim(),
+                            exitCode: 0
+                        });
                     });
-                });
+                } catch (authError)
+                {
+                    reject(new Error(`Authentication error: ${authError.message}`));
+                }
             });
         }
 

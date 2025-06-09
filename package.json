@@ -1,11 +1,17 @@
 {
   "name": "node-red-contrib-balena-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A comprehensive Node-RED wrapper for Balena CLI providing device management, fleet operations, SSH access, and variable management for IoT deployments",
   "main": "balena-cli.js",
   "scripts": {
     "test": "node test.js"
   },
+  "files": [
+    "*.js",
+    "*.html",
+    "*.md",
+    "examples/"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MadnessEngineering/node-red-contrib-balena-cli.git"

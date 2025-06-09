@@ -1,0 +1,308 @@
+[
+    {
+        "id": "config1",
+        "type": "balena-config",
+        "name": "Balena Cloud Config",
+        "loginMethod": "apiToken",
+        "apiToken": "your_api_token_here",
+        "balenaUrl": "https://api.balena-cloud.com",
+        "autoLogin": true
+    },
+    {
+        "id": "tab1",
+        "type": "tab",
+        "label": "Balena Device Monitoring",
+        "disabled": false,
+        "info": "Basic device monitoring flow that lists devices, checks their status, and allows device identification via LED blinking.",
+        "env": []
+    },
+    {
+        "id": "inject1",
+        "type": "inject",
+        "name": "Monitor Devices",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "300",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 80,
+        "z": "tab1",
+        "wires": [
+            [
+                "device-list"
+            ]
+        ]
+    },
+    {
+        "id": "device-list",
+        "type": "balena-device",
+        "name": "List All Devices",
+        "balenaConfig": "config1",
+        "operation": "list",
+        "deviceUuid": "",
+        "fleetName": "",
+        "timeout": 30000,
+        "enableCaching": true,
+        "cacheDuration": 300,
+        "outputFormat": "json",
+        "x": 340,
+        "y": 80,
+        "z": "tab1",
+        "wires": [
+            [
+                "filter-offline"
+            ]
+        ]
+    },
+    {
+        "id": "filter-offline",
+        "type": "function",
+        "name": "Filter Offline Devices",
+        "func": "// Filter devices that are offline\nconst devices = msg.payload;\nconst offlineDevices = devices.filter(device => !device.is_online);\n\nmsg.payload = {\n    total: devices.length,\n    online: devices.filter(d => d.is_online).length,\n    offline: offlineDevices.length,\n    offlineDevices: offlineDevices\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 560,
+        "y": 80,
+        "z": "tab1",
+        "wires": [
+            [
+                "status-debug",
+                "check-offline"
+            ]
+        ]
+    },
+    {
+        "id": "status-debug",
+        "type": "debug",
+        "name": "Device Status",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 790,
+        "y": 40,
+        "z": "tab1",
+        "wires": []
+    },
+    {
+        "id": "check-offline",
+        "type": "switch",
+        "name": "Any Offline?",
+        "property": "payload.offline",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "gt",
+                "v": "0",
+                "vt": "num"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 790,
+        "y": 120,
+        "z": "tab1",
+        "wires": [
+            [
+                "offline-alert"
+            ]
+        ]
+    },
+    {
+        "id": "offline-alert",
+        "type": "function",
+        "name": "Create Alert",
+        "func": "const offline = msg.payload.offline;\nconst devices = msg.payload.offlineDevices;\n\nmsg.payload = {\n    alert: `⚠️ ${offline} device(s) offline`,\n    devices: devices.map(d => ({\n        name: d.device_name,\n        uuid: d.uuid,\n        fleet: d.belongs_to__application[0]?.app_name || 'Unknown',\n        lastSeen: d.last_connectivity_event\n    }))\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 990,
+        "y": 120,
+        "z": "tab1",
+        "wires": [
+            [
+                "alert-debug"
+            ]
+        ]
+    },
+    {
+        "id": "alert-debug",
+        "type": "debug",
+        "name": "Offline Alert",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1200,
+        "y": 120,
+        "z": "tab1",
+        "wires": []
+    },
+    {
+        "id": "inject2",
+        "type": "inject",
+        "name": "Blink Device LED",
+        "props": [
+            {
+                "p": "deviceUuid",
+                "v": "your_device_uuid_here",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 160,
+        "y": 200,
+        "z": "tab1",
+        "wires": [
+            [
+                "device-blink"
+            ]
+        ]
+    },
+    {
+        "id": "device-blink",
+        "type": "balena-device",
+        "name": "Blink Device",
+        "balenaConfig": "config1",
+        "operation": "blink",
+        "deviceUuid": "",
+        "fleetName": "",
+        "timeout": 30000,
+        "enableCaching": false,
+        "cacheDuration": 600,
+        "outputFormat": "json",
+        "x": 380,
+        "y": 200,
+        "z": "tab1",
+        "wires": [
+            [
+                "blink-result"
+            ]
+        ]
+    },
+    {
+        "id": "blink-result",
+        "type": "debug",
+        "name": "Blink Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 590,
+        "y": 200,
+        "z": "tab1",
+        "wires": []
+    },
+    {
+        "id": "inject3",
+        "type": "inject",
+        "name": "Get Device Info",
+        "props": [
+            {
+                "p": "deviceUuid",
+                "v": "your_device_uuid_here",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 160,
+        "y": 280,
+        "z": "tab1",
+        "wires": [
+            [
+                "device-info"
+            ]
+        ]
+    },
+    {
+        "id": "device-info",
+        "type": "balena-device",
+        "name": "Device Info",
+        "balenaConfig": "config1",
+        "operation": "info",
+        "deviceUuid": "",
+        "fleetName": "",
+        "timeout": 30000,
+        "enableCaching": true,
+        "cacheDuration": 300,
+        "outputFormat": "json",
+        "x": 360,
+        "y": 280,
+        "z": "tab1",
+        "wires": [
+            [
+                "format-info"
+            ]
+        ]
+    },
+    {
+        "id": "format-info",
+        "type": "function",
+        "name": "Format Device Info",
+        "func": "const device = msg.payload;\n\nmsg.payload = {\n    name: device.device_name,\n    uuid: device.uuid,\n    status: device.is_online ? 'Online' : 'Offline',\n    fleet: device.belongs_to__application[0]?.app_name || 'Unknown',\n    deviceType: device.is_of__device_type[0]?.slug,\n    osVersion: device.os_version,\n    supervisorVersion: device.supervisor_version,\n    lastSeen: device.last_connectivity_event,\n    cpuUsage: device.cpu_usage,\n    memoryUsage: device.memory_usage,\n    temperature: device.cpu_temp\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 570,
+        "y": 280,
+        "z": "tab1",
+        "wires": [
+            [
+                "info-debug"
+            ]
+        ]
+    },
+    {
+        "id": "info-debug",
+        "type": "debug",
+        "name": "Device Details",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 790,
+        "y": 280,
+        "z": "tab1",
+        "wires": []
+    }
+] 

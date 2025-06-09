@@ -1,0 +1,505 @@
+[
+    {
+        "id": "config2",
+        "type": "balena-config",
+        "name": "Balena Fleet Config",
+        "loginMethod": "apiToken",
+        "apiToken": "your_api_token_here",
+        "balenaUrl": "https://api.balena-cloud.com",
+        "autoLogin": true
+    },
+    {
+        "id": "tab2",
+        "type": "tab",
+        "label": "Fleet Management",
+        "disabled": false,
+        "info": "Comprehensive fleet management flow demonstrating fleet operations, release management, and device control.",
+        "env": []
+    },
+    {
+        "id": "inject4",
+        "type": "inject",
+        "name": "List All Fleets",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 80,
+        "z": "tab2",
+        "wires": [
+            [
+                "fleet-list"
+            ]
+        ]
+    },
+    {
+        "id": "fleet-list",
+        "type": "balena-fleet",
+        "name": "List Fleets",
+        "balenaConfig": "config2",
+        "operation": "list",
+        "fleetName": "",
+        "organization": "",
+        "deviceType": "",
+        "timeout": 30000,
+        "enableCaching": true,
+        "cacheDuration": 600,
+        "outputFormat": "json",
+        "x": 320,
+        "y": 80,
+        "z": "tab2",
+        "wires": [
+            [
+                "fleet-summary"
+            ]
+        ]
+    },
+    {
+        "id": "fleet-summary",
+        "type": "function",
+        "name": "Fleet Summary",
+        "func": "const fleets = msg.payload;\n\nmsg.payload = {\n    totalFleets: fleets.length,\n    fleets: fleets.map(fleet => ({\n        name: fleet.app_name,\n        deviceType: fleet.is_for__device_type[0]?.slug,\n        deviceCount: fleet.owns__device?.length || 0,\n        onlineDevices: fleet.owns__device?.filter(d => d.is_online)?.length || 0,\n        createdAt: fleet.created_at\n    }))\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 530,
+        "y": 80,
+        "z": "tab2",
+        "wires": [
+            [
+                "fleet-debug"
+            ]
+        ]
+    },
+    {
+        "id": "fleet-debug",
+        "type": "debug",
+        "name": "Fleet Overview",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 740,
+        "y": 80,
+        "z": "tab2",
+        "wires": []
+    },
+    {
+        "id": "inject5",
+        "type": "inject",
+        "name": "Create Test Fleet",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"fleetName\":\"test-iot-devices\",\"deviceType\":\"raspberry-pi4-64\",\"organization\":\"\"}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 160,
+        "y": 160,
+        "z": "tab2",
+        "wires": [
+            [
+                "fleet-create"
+            ]
+        ]
+    },
+    {
+        "id": "fleet-create",
+        "type": "balena-fleet",
+        "name": "Create Fleet",
+        "balenaConfig": "config2",
+        "operation": "create",
+        "fleetName": "",
+        "organization": "",
+        "deviceType": "",
+        "timeout": 30000,
+        "enableCaching": false,
+        "cacheDuration": 600,
+        "outputFormat": "json",
+        "x": 370,
+        "y": 160,
+        "z": "tab2",
+        "wires": [
+            [
+                "create-result"
+            ]
+        ]
+    },
+    {
+        "id": "create-result",
+        "type": "debug",
+        "name": "Create Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 580,
+        "y": 160,
+        "z": "tab2",
+        "wires": []
+    },
+    {
+        "id": "inject6",
+        "type": "inject",
+        "name": "Get Fleet Info",
+        "props": [
+            {
+                "p": "fleetName",
+                "v": "your_fleet_name_here",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 150,
+        "y": 240,
+        "z": "tab2",
+        "wires": [
+            [
+                "fleet-info"
+            ]
+        ]
+    },
+    {
+        "id": "fleet-info",
+        "type": "balena-fleet",
+        "name": "Fleet Info",
+        "balenaConfig": "config2",
+        "operation": "info",
+        "fleetName": "",
+        "organization": "",
+        "deviceType": "",
+        "timeout": 30000,
+        "enableCaching": true,
+        "cacheDuration": 300,
+        "outputFormat": "json",
+        "x": 340,
+        "y": 240,
+        "z": "tab2",
+        "wires": [
+            [
+                "info-result"
+            ]
+        ]
+    },
+    {
+        "id": "info-result",
+        "type": "debug",
+        "name": "Fleet Details",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 530,
+        "y": 240,
+        "z": "tab2",
+        "wires": []
+    },
+    {
+        "id": "inject7",
+        "type": "inject",
+        "name": "List Releases",
+        "props": [
+            {
+                "p": "fleetName",
+                "v": "your_fleet_name_here",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 150,
+        "y": 320,
+        "z": "tab2",
+        "wires": [
+            [
+                "fleet-releases"
+            ]
+        ]
+    },
+    {
+        "id": "fleet-releases",
+        "type": "balena-fleet",
+        "name": "Fleet Releases",
+        "balenaConfig": "config2",
+        "operation": "releases",
+        "fleetName": "",
+        "organization": "",
+        "deviceType": "",
+        "timeout": 30000,
+        "enableCaching": true,
+        "cacheDuration": 600,
+        "outputFormat": "json",
+        "x": 360,
+        "y": 320,
+        "z": "tab2",
+        "wires": [
+            [
+                "format-releases"
+            ]
+        ]
+    },
+    {
+        "id": "format-releases",
+        "type": "function",
+        "name": "Format Releases",
+        "func": "const releases = msg.payload;\n\nmsg.payload = {\n    totalReleases: releases.length,\n    latestRelease: releases[0],\n    releases: releases.map(release => ({\n        id: release.id,\n        commit: release.commit,\n        status: release.status,\n        createdAt: release.created_at,\n        semver: release.semver,\n        version: release.release_version\n    }))\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 580,
+        "y": 320,
+        "z": "tab2",
+        "wires": [
+            [
+                "releases-debug"
+            ]
+        ]
+    },
+    {
+        "id": "releases-debug",
+        "type": "debug",
+        "name": "Release Info",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 790,
+        "y": 320,
+        "z": "tab2",
+        "wires": []
+    },
+    {
+        "id": "inject8",
+        "type": "inject",
+        "name": "Pin Release",
+        "props": [
+            {
+                "p": "payload",
+                "v": "{\"fleetName\":\"your_fleet_name_here\",\"releaseId\":\"123456\"}",
+                "vt": "json"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 140,
+        "y": 400,
+        "z": "tab2",
+        "wires": [
+            [
+                "fleet-pin"
+            ]
+        ]
+    },
+    {
+        "id": "fleet-pin",
+        "type": "balena-fleet",
+        "name": "Pin Release",
+        "balenaConfig": "config2",
+        "operation": "pin_release",
+        "fleetName": "",
+        "organization": "",
+        "deviceType": "",
+        "timeout": 30000,
+        "enableCaching": false,
+        "cacheDuration": 600,
+        "outputFormat": "json",
+        "x": 340,
+        "y": 400,
+        "z": "tab2",
+        "wires": [
+            [
+                "pin-result"
+            ]
+        ]
+    },
+    {
+        "id": "pin-result",
+        "type": "debug",
+        "name": "Pin Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 520,
+        "y": 400,
+        "z": "tab2",
+        "wires": []
+    },
+    {
+        "id": "inject9",
+        "type": "inject",
+        "name": "Track Latest",
+        "props": [
+            {
+                "p": "fleetName",
+                "v": "your_fleet_name_here",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 150,
+        "y": 480,
+        "z": "tab2",
+        "wires": [
+            [
+                "fleet-track"
+            ]
+        ]
+    },
+    {
+        "id": "fleet-track",
+        "type": "balena-fleet",
+        "name": "Track Latest",
+        "balenaConfig": "config2",
+        "operation": "track_latest",
+        "fleetName": "",
+        "organization": "",
+        "deviceType": "",
+        "timeout": 30000,
+        "enableCaching": false,
+        "cacheDuration": 600,
+        "outputFormat": "json",
+        "x": 350,
+        "y": 480,
+        "z": "tab2",
+        "wires": [
+            [
+                "track-result"
+            ]
+        ]
+    },
+    {
+        "id": "track-result",
+        "type": "debug",
+        "name": "Track Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 550,
+        "y": 480,
+        "z": "tab2",
+        "wires": []
+    },
+    {
+        "id": "inject10",
+        "type": "inject",
+        "name": "Restart Fleet",
+        "props": [
+            {
+                "p": "fleetName",
+                "v": "your_fleet_name_here",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 150,
+        "y": 560,
+        "z": "tab2",
+        "wires": [
+            [
+                "fleet-restart"
+            ]
+        ]
+    },
+    {
+        "id": "fleet-restart",
+        "type": "balena-fleet",
+        "name": "Restart Fleet",
+        "balenaConfig": "config2",
+        "operation": "restart",
+        "fleetName": "",
+        "organization": "",
+        "deviceType": "",
+        "timeout": 60000,
+        "enableCaching": false,
+        "cacheDuration": 600,
+        "outputFormat": "json",
+        "x": 360,
+        "y": 560,
+        "z": "tab2",
+        "wires": [
+            [
+                "restart-result"
+            ]
+        ]
+    },
+    {
+        "id": "restart-result",
+        "type": "debug",
+        "name": "Restart Result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 580,
+        "y": 560,
+        "z": "tab2",
+        "wires": []
+    }
+] 
