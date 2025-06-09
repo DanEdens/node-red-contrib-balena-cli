@@ -1,0 +1,127 @@
+<script type="text/javascript">
+    RED.nodes.registerType('balena-supervisor', {
+        category: 'balena',
+        color: '#8cc8ff',
+        defaults: {
+            name: { value: "" },
+            operation: { value: "device", required: true },
+            serviceId: { value: "" },
+            fieldType: { value: "msg" },
+            field: { value: "payload" },
+            timeout: { value: 30000, validate: RED.validators.number() }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "balena.png",
+        label: function() {
+            return this.name || "balena-supervisor";
+        },
+        oneditprepare: function() {
+            $("#node-input-fieldType").typedInput({
+                default: 'msg',
+                types: ['msg', 'flow', 'global']
+            });
+            
+            $("#node-input-field").typedInput({
+                default: 'payload',
+                types: ['msg', 'flow', 'global']
+            });
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="balena-supervisor">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-operation"><i class="fa fa-cog"></i> Operation</label>
+        <select id="node-input-operation">
+            <option value="ping">Ping</option>
+            <option value="blink">Blink</option>
+            <option value="device">Device State</option>
+            <option value="restart">Restart Service</option>
+            <option value="reboot">Reboot Device</option>
+            <option value="shutdown">Shutdown Device</option>
+            <option value="purge">Purge Data</option>
+            <option value="update">Update</option>
+            <option value="lock">Lock Updates</option>
+            <option value="unlock">Unlock Updates</option>
+            <option value="apps">Application State</option>
+            <option value="logs">Logs</option>
+        </select>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-serviceId"><i class="fa fa-server"></i> Service ID</label>
+        <input type="text" id="node-input-serviceId" placeholder="Service ID (for restart operation)">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-fieldType"><i class="fa fa-code"></i> Input Source</label>
+        <input type="text" id="node-input-fieldType">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-field"><i class="fa fa-dot-circle-o"></i> Field</label>
+        <input type="text" id="node-input-field">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-input-timeout"><i class="fa fa-clock-o"></i> Timeout (ms)</label>
+        <input type="number" id="node-input-timeout" placeholder="30000">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="balena-supervisor">
+    <p>Interacts with the balena supervisor API when running on a balena device.</p>
+    
+    <h3>Details</h3>
+    <p>This node provides access to the balena supervisor API for local device operations. 
+    It only works when Node-RED is running on a balena device with supervisor access.</p>
+    
+    <h3>Operations</h3>
+    <ul>
+        <li><b>ping</b> - Check supervisor connectivity</li>
+        <li><b>blink</b> - Blink device LED for identification</li>
+        <li><b>device</b> - Get device state information</li>
+        <li><b>restart</b> - Restart a specific service/container</li>
+        <li><b>reboot</b> - Reboot the entire device</li>
+        <li><b>shutdown</b> - Shutdown the device</li>
+        <li><b>purge</b> - Purge application data</li>
+        <li><b>update</b> - Trigger application update</li>
+        <li><b>lock</b> - Lock updates</li>
+        <li><b>unlock</b> - Unlock updates</li>
+        <li><b>apps</b> - Get application state</li>
+        <li><b>logs</b> - Get supervisor logs</li>
+    </ul>
+    
+    <h3>Input</h3>
+    <p>Parameters can be passed via the configured input field or directly in the message:</p>
+    <ul>
+        <li><code>msg.operation</code> - Override the configured operation</li>
+        <li><code>msg.serviceId</code> - Service ID for restart operations</li>
+        <li><code>msg.force</code> - Force update (boolean)</li>
+        <li><code>msg.count</code> - Number of log entries</li>
+        <li><code>msg.since</code> - Log entries since timestamp</li>
+        <li><code>msg.until</code> - Log entries until timestamp</li>
+        <li><code>msg.format</code> - Log format</li>
+    </ul>
+    
+    <h3>Output</h3>
+    <p>The response from the supervisor API is placed in <code>msg.payload</code>, with additional properties:</p>
+    <ul>
+        <li><code>msg.statusCode</code> - HTTP status code</li>
+        <li><code>msg.headers</code> - Response headers</li>
+        <li><code>msg.operation</code> - The operation that was performed</li>
+    </ul>
+    
+    <h3>Environment Requirements</h3>
+    <p>Requires the following environment variables (automatically available on balena devices):</p>
+    <ul>
+        <li><code>BALENA_SUPERVISOR_ADDRESS</code></li>
+        <li><code>BALENA_SUPERVISOR_API_KEY</code></li>
+    </ul>
+</script> 

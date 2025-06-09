@@ -1,0 +1,194 @@
+<script type="text/javascript">
+    RED.nodes.registerType('balena-config', {
+        category: 'config',
+        defaults: {
+            name: { value: "", required: false },
+            apiUrl: { value: "https://api.balena-cloud.com" },
+            loginMethod: { value: "credentials" },
+            autoLogin: { value: true }
+        },
+        credentials: {
+            email: { type: "text" },
+            password: { type: "password" },
+            apiToken: { type: "password" }
+        },
+        label: function() {
+            return this.name || "Balena Config";
+        },
+        oneditprepare: function() {
+            // Handle login method change
+            $("#node-config-input-loginMethod").change(function() {
+                const method = $(this).val();
+                
+                // Show/hide credential fields based on method
+                if (method === 'credentials') {
+                    $("#credentials-section").show();
+                    $("#token-section").hide();
+                } else if (method === 'token') {
+                    $("#credentials-section").hide();
+                    $("#token-section").show();
+                } else if (method === 'browser') {
+                    $("#credentials-section").hide();
+                    $("#token-section").hide();
+                }
+            });
+            
+            // Trigger initial change
+            $("#node-config-input-loginMethod").trigger('change');
+            
+            // Test connection button
+            $("#test-connection").click(function() {
+                const btn = $(this);
+                const originalText = btn.text();
+                
+                btn.text("Testing...").prop('disabled', true);
+                
+                const testData = {
+                    apiUrl: $("#node-config-input-apiUrl").val(),
+                    loginMethod: $("#node-config-input-loginMethod").val(),
+                    email: $("#node-config-input-email").val(),
+                    password: $("#node-config-input-password").val(),
+                    apiToken: $("#node-config-input-apiToken").val()
+                };
+                
+                // Simple test - try to check balena version
+                $.ajax({
+                    url: 'balena-config/test',
+                    type: 'POST',
+                    data: JSON.stringify(testData),
+                    contentType: 'application/json',
+                    success: function(data) {
+                        if (data.success) {
+                            RED.notify("Connection test successful: " + data.message, "success");
+                        } else {
+                            RED.notify("Connection test failed: " + data.error, "error");
+                        }
+                    },
+                    error: function() {
+                        RED.notify("Connection test failed: Network error", "error");
+                    },
+                    complete: function() {
+                        btn.text(originalText).prop('disabled', false);
+                    }
+                });
+            });
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="balena-config">
+    <div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-config-input-name" placeholder="My Balena Account">
+    </div>
+    
+    <div class="form-row">
+        <label for="node-config-input-apiUrl"><i class="fa fa-globe"></i> API URL</label>
+        <input type="text" id="node-config-input-apiUrl" placeholder="https://api.balena-cloud.com">
+        <div class="form-tips">
+            <strong>Default:</strong> https://api.balena-cloud.com<br>
+            <strong>For openBalena:</strong> Use your openBalena API URL
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-config-input-loginMethod"><i class="fa fa-key"></i> Login Method</label>
+        <select id="node-config-input-loginMethod">
+            <option value="credentials">Email & Password</option>
+            <option value="token">API Token</option>
+            <option value="browser">Browser Login (Interactive)</option>
+        </select>
+    </div>
+    
+    <div id="credentials-section">
+        <div class="form-row">
+            <label for="node-config-input-email"><i class="fa fa-user"></i> Email</label>
+            <input type="text" id="node-config-input-email" placeholder="your-email@example.com">
+        </div>
+        
+        <div class="form-row">
+            <label for="node-config-input-password"><i class="fa fa-lock"></i> Password</label>
+            <input type="password" id="node-config-input-password" placeholder="Your Balena password">
+        </div>
+    </div>
+    
+    <div id="token-section" style="display: none;">
+        <div class="form-row">
+            <label for="node-config-input-apiToken"><i class="fa fa-code"></i> API Token</label>
+            <input type="password" id="node-config-input-apiToken" placeholder="Your Balena API token">
+            <div class="form-tips">
+                Get your API token from: <a href="https://dashboard.balena-cloud.com/preferences/access-tokens" target="_blank">Balena Dashboard → Preferences → Access Tokens</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <label for="node-config-input-autoLogin"><i class="fa fa-sign-in"></i> Auto Login</label>
+        <input type="checkbox" id="node-config-input-autoLogin" style="width: auto;">
+        <label for="node-config-input-autoLogin" style="width: auto; margin-left: 5px;">
+            Automatically login when Node-RED starts
+        </label>
+    </div>
+    
+    <div class="form-row">
+        <button type="button" id="test-connection" class="btn btn-secondary">
+            <i class="fa fa-plug"></i> Test Connection
+        </button>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="balena-config">
+    <p>Configuration node for Balena CLI authentication and connection settings.</p>
+    
+    <h3>Details</h3>
+    <p>This configuration node manages authentication with the Balena CLI and can be shared across multiple Balena nodes.</p>
+    
+    <h3>Login Methods</h3>
+    <dl class="message-properties">
+        <dt>Email & Password <span class="property-type">credentials</span></dt>
+        <dd>Login using your Balena account email and password. Credentials are stored securely in Node-RED.</dd>
+        
+        <dt>API Token <span class="property-type">token</span></dt>
+        <dd>Login using a Balena API token. More secure for automation and CI/CD scenarios.</dd>
+        
+        <dt>Browser Login <span class="property-type">browser</span></dt>
+        <dd>Interactive login via browser. Useful for development but requires manual intervention.</dd>
+    </dl>
+    
+    <h3>Configuration Options</h3>
+    <dl class="message-properties">
+        <dt>Name <span class="property-type">string</span></dt>
+        <dd>Display name for this configuration</dd>
+        
+        <dt>API URL <span class="property-type">string</span></dt>
+        <dd>Balena API endpoint. Use default for Balena Cloud or your openBalena instance URL.</dd>
+        
+        <dt>Auto Login <span class="property-type">boolean</span></dt>
+        <dd>Whether to automatically login when Node-RED starts</dd>
+    </dl>
+    
+    <h3>Security Notes</h3>
+    <ul>
+        <li>Credentials are encrypted and stored securely by Node-RED</li>
+        <li>API tokens are recommended for production deployments</li>
+        <li>Browser login requires manual interaction and is not suitable for headless deployments</li>
+        <li>The CLI session is shared across all nodes using this configuration</li>
+    </ul>
+    
+    <h3>Getting API Tokens</h3>
+    <p>To create an API token:</p>
+    <ol>
+        <li>Login to the <a href="https://dashboard.balena-cloud.com" target="_blank">Balena Dashboard</a></li>
+        <li>Go to Preferences → Access Tokens</li>
+        <li>Click "Create API Token"</li>
+        <li>Give it a name and copy the token</li>
+        <li>Paste the token in the API Token field above</li>
+    </ol>
+    
+    <h3>openBalena Support</h3>
+    <p>For openBalena instances, change the API URL to match your deployment, for example:</p>
+    <ul>
+        <li><code>https://api.openbalena.local</code></li>
+        <li><code>https://api.mycompany.com</code></li>
+    </ul>
+</script> 

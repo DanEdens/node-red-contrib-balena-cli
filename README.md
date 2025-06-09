@@ -4,13 +4,44 @@ A comprehensive Node-RED wrapper for the Balena CLI, providing powerful IoT devi
 
 ## Overview
 
-This Node-RED contribution package provides five specialized nodes that wrap the Balena CLI, enabling seamless integration of Balena IoT operations into Node-RED automation workflows:
+This Node-RED contribution package provides six specialized nodes that wrap the Balena CLI, enabling seamless integration of Balena IoT operations into Node-RED automation workflows:
 
-- **balena-device** - Device management and control
-- **balena-fleet** - Fleet lifecycle and configuration management  
-- **balena-ssh** - SSH access and command execution on devices
-- **balena-variables** - Environment variable management for fleets and devices
-- **balena-deploy** - Code deployment and release management
+- **balena-config**: Configuration node for authentication and connection management
+- **balena-device**: Device management and control
+- **balena-fleet**: Fleet lifecycle and configuration management  
+- **balena-ssh**: SSH access and command execution on devices
+- **balena-variables**: Environment variable management for fleets and devices
+- **balena-deploy**: Code deployment and release management
+- **balena-supervisor**: Local supervisor operations for nodes running on balena devices
+
+## Authentication
+
+### Balena Configuration Node
+
+The `balena-config` node provides centralized authentication management for all Balena operations. It supports three login methods:
+
+1. **Email & Password** - Traditional login with Balena account credentials
+2. **API Token** - Token-based authentication (recommended for production)  
+3. **Browser Login** - Interactive browser-based login (development only)
+
+#### Getting API Tokens
+For production deployments, API tokens are recommended:
+
+1. Login to the [Balena Dashboard](https://dashboard.balena-cloud.com)
+2. Go to Preferences → Access Tokens
+3. Click "Create API Token" 
+4. Give it a name and copy the token
+5. Use the token in your `balena-config` node
+
+#### openBalena Support
+For openBalena instances, simply change the API URL in the config node to match your deployment (e.g., `https://api.openbalena.local`).
+
+### Security Features
+
+- Credentials are encrypted and stored securely by Node-RED
+- Automatic authentication and session management
+- Support for custom Balena API endpoints
+- Configurable auto-login behavior
 
 ## Features
 
@@ -72,12 +103,14 @@ This Node-RED contribution package provides five specialized nodes that wrap the
    npm install -g balena-cli
    ```
 
-2. **Authentication** - Login to your Balena account:
-   ```bash
-   balena login
-   ```
+2. **Balena Account** - You'll need either:
+   - A Balena Cloud account (free at [balena.io](https://balena.io))
+   - Access to an openBalena instance
+   - An API token for authentication
 
 3. **Node-RED** - Ensure Node-RED is installed and running
+
+**Note:** You no longer need to manually login to the Balena CLI as authentication is handled automatically by the `balena-config` node.
 
 ### Install the Package
 
@@ -106,7 +139,16 @@ npm link node-red-contrib-balena-cli
 
 ## Quick Start
 
-### Basic Device Listing
+### 1. Setup Authentication
+First, create a `balena-config` node:
+1. Drag a `balena-config` node to your flow
+2. Double-click to configure it
+3. Choose your login method (Email/Password, API Token, or Browser)
+4. Enter your credentials
+5. Test the connection
+6. Deploy the configuration
+
+### 2. Basic Device Listing
 ```json
 {
   "operation": "list",
@@ -114,7 +156,7 @@ npm link node-red-contrib-balena-cli
 }
 ```
 
-### SSH Command Execution
+### 3. SSH Command Execution
 ```json
 {
   "operation": "command",
@@ -162,6 +204,8 @@ Manages Balena devices with operations including listing, information retrieval,
 - `logs` - Retrieve device logs
 - `move` - Transfer device between fleets
 - `rename` - Change device name
+- `blink` - Blink device LED for identification
+- `ping` - Check device connectivity status
 
 ### balena-fleet
 
@@ -228,6 +272,32 @@ Handles code deployment, building, and release management for Balena application
 - `release_finalize` / `release_invalidate` - Release management
 - `join` / `leave` - Device fleet management
 - `os_configure` / `local_configure` - OS and device configuration
+
+### balena-supervisor
+
+**Category:** balena  
+**Color:** #8cc8ff (Light Blue)  
+**Icon:** balena.png
+
+Manages local supervisor operations for nodes running ON balena devices (not remote management).
+
+**Operations:**
+- `ping` - Check supervisor connectivity
+- `blink` - Blink device LED for identification
+- `device` - Get device state information
+- `restart` - Restart a specific service/container
+- `reboot` - Reboot the entire device
+- `shutdown` - Shutdown the device
+- `purge` - Purge application data
+- `update` - Trigger application update
+- `lock` - Lock updates
+- `unlock` - Unlock updates
+- `apps` - Get application state
+- `logs` - Get supervisor logs
+
+**Requirements:**
+- Must be running on a balena device
+- Requires `BALENA_SUPERVISOR_ADDRESS` and `BALENA_SUPERVISOR_API_KEY` environment variables
 
 ## Configuration Options
 

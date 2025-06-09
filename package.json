@@ -37,11 +37,13 @@
   "homepage": "https://github.com/MadnessEngineering/node-red-contrib-balena-cli#readme",
   "node-red": {
     "nodes": {
+      "balena-config": "balena-config.js",
       "balena-device": "balena-device.js",
       "balena-fleet": "balena-fleet.js",
       "balena-ssh": "balena-ssh.js",
       "balena-variables": "balena-variables.js",
-      "balena-deploy": "balena-deploy.js"
+      "balena-deploy": "balena-deploy.js",
+      "balena-supervisor": "balena-supervisor.js"
     }
   },
   "dependencies": {

@@ -22,6 +22,14 @@ module.exports = function (RED)
         node.timeout = parseInt(config.timeout) || 30000;
         node.outputFormat = config.outputFormat || "json";
 
+        // Get the configuration node
+        node.balenaConfig = RED.nodes.getNode(config.balenaConfig);
+        if (!node.balenaConfig)
+        {
+            node.error("No Balena configuration specified");
+            return;
+        }
+
         // Initialize cache
         const cache = node.enableCaching ? new NodeCache({
             stdTTL: node.cacheDuration,
@@ -48,39 +56,61 @@ module.exports = function (RED)
         // Execute Balena CLI command
         function executeBalenaCommand(command, options = {})
         {
-            return new Promise((resolve, reject) =>
+            return new Promise(async (resolve, reject) =>
             {
-                const timeoutId = setTimeout(() =>
+                try
                 {
-                    reject(new Error(`Command timed out after ${node.timeout}ms`));
-                }, node.timeout);
-
-                exec(command, options, (error, stdout, stderr) =>
-                {
-                    clearTimeout(timeoutId);
-
-                    if (error)
+                    // Ensure we're authenticated
+                    const isAuthenticated = await node.balenaConfig.checkAuth();
+                    if (!isAuthenticated)
                     {
-                        reject(new Error(`Balena CLI error: ${error.message}\nStderr: ${stderr}`));
-                        return;
+                        // Try to login
+                        const loginSuccess = await node.balenaConfig.login();
+                        if (!loginSuccess)
+                        {
+                            reject(new Error("Balena authentication failed"));
+                            return;
+                        }
                     }
 
-                    try
+                    // Get the authenticated command
+                    const authenticatedCommand = node.balenaConfig.getAuthenticatedCommand(command);
+
+                    const timeoutId = setTimeout(() =>
                     {
-                        // Try to parse as JSON if output format is JSON
-                        if (node.outputFormat === "json" && stdout.trim())
+                        reject(new Error(`Command timed out after ${node.timeout}ms`));
+                    }, node.timeout);
+
+                    exec(authenticatedCommand, options, (error, stdout, stderr) =>
+                    {
+                        clearTimeout(timeoutId);
+
+                        if (error)
                         {
-                            resolve(JSON.parse(stdout));
-                        } else
+                            reject(new Error(`Balena CLI error: ${error.message}\nStderr: ${stderr}`));
+                            return;
+                        }
+
+                        try
                         {
+                            // Try to parse as JSON if output format is JSON
+                            if (node.outputFormat === "json" && stdout.trim())
+                            {
+                                resolve(JSON.parse(stdout));
+                            } else
+                            {
+                                resolve(stdout.trim());
+                            }
+                        } catch (parseError)
+                        {
+                            // If JSON parsing fails, return raw text
                             resolve(stdout.trim());
                         }
-                    } catch (parseError)
-                    {
-                        // If JSON parsing fails, return raw text
-                        resolve(stdout.trim());
-                    }
-                });
+                    });
+                } catch (authError)
+                {
+                    reject(new Error(`Authentication error: ${authError.message}`));
+                }
             });
         }
 
