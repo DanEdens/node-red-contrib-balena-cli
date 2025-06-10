@@ -133,7 +133,7 @@ npm install node-red-contrib-balena-cli
 
 #### Manual Installation
 ```bash
-git clone https://github.com/MadnessEngineering/node-red-contrib-balena-cli.git
+git clone https://github.com/DanEdens/node-red-contrib-balena-cli.git
 cd node-red-contrib-balena-cli
 npm install
 npm link
@@ -475,7 +475,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 4. Run tests: `npm test`
 
 ### Reporting Issues
-Please report issues on our [GitHub Issues](https://github.com/MadnessEngineering/node-red-contrib-balena-cli/issues) page with:
+Please report issues on our [GitHub Issues](https://github.com/DanEdens/node-red-contrib-balena-cli/issues) page with:
 - Node-RED version
 - Balena CLI version
 - Operating system
@@ -488,16 +488,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- **Documentation:** [GitHub Wiki](https://github.com/MadnessEngineering/node-red-contrib-balena-cli/wiki)
-- **Issues:** [GitHub Issues](https://github.com/MadnessEngineering/node-red-contrib-balena-cli/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/MadnessEngineering/node-red-contrib-balena-cli/discussions)
+- **Documentation:** [GitHub Wiki](https://github.com/DanEdens/node-red-contrib-balena-cli/wiki)
+- **Issues:** [GitHub Issues](https://github.com/DanEdens/node-red-contrib-balena-cli/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/DanEdens/node-red-contrib-balena-cli/discussions)
 
 ## Acknowledgments
 
 - [Balena](https://balena.io) - For the excellent IoT platform and CLI
 - [Node-RED](https://nodered.org) - For the fantastic flow-based programming environment
-- [MadnessEngineering](https://github.com/MadnessEngineering) - Project maintainers
+- [DanEdens](https://github.com/DanEdens) - Project maintainer
 
 ---
 
-**Made with ❤️ by the MadnessEngineering team**
+**Made with ❤️ by D. Edens**

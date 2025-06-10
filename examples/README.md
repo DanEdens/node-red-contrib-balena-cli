@@ -260,10 +260,10 @@ After trying these examples:
 - [Balena CLI Documentation](https://docs.balena.io/reference/balena-cli/)
 - [Node-RED Documentation](https://nodered.org/docs/)
 - [Balena Dashboard](https://dashboard.balena-cloud.com)
-- [Package Repository](https://github.com/MadnessEngineering/node-red-contrib-balena-cli)
+- [Package Repository](https://github.com/DanEdens/node-red-contrib-balena-cli)
 
 ---
 
 **Happy IoT Development!** 🚀
 
-For questions or support, please visit our [GitHub Issues](https://github.com/MadnessEngineering/node-red-contrib-balena-cli/issues) page. 
+For questions or support, please visit our [GitHub Issues](https://github.com/DanEdens/node-red-contrib-balena-cli/issues) page. 
